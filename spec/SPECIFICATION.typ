@@ -17,6 +17,8 @@
 #set text(size: 16pt)
 Specification - Version 1.0
 
+#align(bottom + right, [#datetime.today().display("[day padding:none] [month repr:long] [year]")])
+
 #pagebreak()
 
 #set heading(numbering: "1.1.1")
@@ -48,6 +50,11 @@ Kali is a simple, elegant, and powerful programming language. It is designed to 
 
 == Existing Languages
 
+Kali takes inspiration from a variety of existing programming languages, including:
+- Rust
+- TypeScript
+- OCaml
+
 == Design Goals
 
 
@@ -57,13 +64,51 @@ Kali is a simple, elegant, and powerful programming language. It is designed to 
 
 === Primitives
 
-Kali has support for six primitive data types:
+Like most programming languages, Kali has support for a variety of primitive data types:
 
 - Integers
-- Floating-point numbers
+- Floats
 - Booleans
 - Strings
-- Characters
+
+==== Integers
+
+Integers are whole numbers, and can be positive or negative.
+
+```kali
+let x = 10
+let y = -5
+```
+
+==== Floats
+
+Floats are numbers with a decimal point, and can be positive or negative.
+
+```kali
+let x = 10.5
+let y = -5.5
+```
+
+Kali uses the IEEE 754 standard for floating point arithmetic.
+
+==== Booleans
+
+Booleans are a data type that can have one of two values: `true` or `false`.
+
+```kali
+let x = true
+let y = false
+```
+
+==== Strings
+
+Strings are a sequence of characters, and are enclosed in double quotes.
+
+```kali
+let x = "Hello, world!"
+```
+
+All strings in Kali are UTF-8 encoded.
 
 === Composite
 
@@ -130,7 +175,12 @@ Arrays are a composite data type that can hold multiple values of the same type.
 let numbers = [1, 2, 3, 4, 5]
 ```
 
-==== Records
+```ebnf
+array_literal = "[" expr ("," expr)* "]"
+array_access = expr "[" expr "]"
+```
+
+==== Structs
 
 Records are a convenient way to define named composite data types.
 
@@ -166,13 +216,45 @@ The never type is a special data type that has no values. It is used to represen
 
 It is often used to represent type errors, or to signal that type checking has failed.
 
+```kali
+type Point = { x: Int, y: Int }
+```
+
+Fields on a struct can be accessed using the `.` operator.
+
+```kali
+let point = { x: 10, y: 20 }
+let x = point.x
+```
+
 == Variables
 
 == Control Flow
 
+== Pattern Matching
+
+Pattern matching is a powerful feature that allows you to destructure complex data types and extract their values.
+
 == Functions
 
+=== Higher-order Functions
+
+=== Currying
+
+Currying is the process of transforming a function that takes multiple arguments into a series of functions that each take a single argument.
+
+```kali
+let add = x: Int, y: Int => x + y
+let add1 = add 1
+```
+
+=== Closures
+
+Closures are a special kind of function that can capture variables from their surrounding environment.
+
 = Type System
+
+Kali's type system is heavily inspired by that of TypeScript and OCaml, and is designed to be both expressive and flexible.
 
 == Traits
 

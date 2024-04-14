@@ -1,5 +1,8 @@
-use pest_derive::Parser;
+//! # kali-parse
+//!
+//! This crate provides a parser for the Kali language.
 
-#[derive(Parser)]
-#[grammar = "grammar.pest"]
-struct Parser;
+mod literal;
+mod util;
+
+pub use literal::*;

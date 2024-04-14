@@ -1,3 +1,7 @@
 [workspace]
 resolver = "2"
+<<<<<<< HEAD
 members = ["./crates/*"]
+=======
+members = ["crates/*"]
+>>>>>>> b642a7c518a90cbf5f7d8f8f75547ec40b988187
