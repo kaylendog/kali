@@ -5,6 +5,7 @@ use kali_type::{Constant, InferenceContext, Type, TypeInferenceError, Typed, Uni
 use crate::expr::Expr;
 
 /// A literal value.
+#[derive(Debug, Clone)]
 pub enum Literal {
     /// An integer literal.
     Int(i64),
@@ -22,6 +23,22 @@ pub enum Literal {
     Tuple(Vec<Expr>),
     /// A struct literal.
     Struct(BTreeMap<String, Expr>),
+}
+
+impl PartialEq for Literal {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Literal::Int(a), Literal::Int(b)) => a == b,
+            (Literal::Float(a), Literal::Float(b)) => a == b,
+            (Literal::Bool(a), Literal::Bool(b)) => a == b,
+            (Literal::String(a), Literal::String(b)) => a == b,
+            (Literal::Unit, Literal::Unit) => true,
+            (Literal::Array(a), Literal::Array(b)) => a == b,
+            (Literal::Tuple(a), Literal::Tuple(b)) => a == b,
+            (Literal::Struct(a), Literal::Struct(b)) => a == b,
+            _ => false,
+        }
+    }
 }
 
 impl Typed for Literal {

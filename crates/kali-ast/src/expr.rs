@@ -3,11 +3,22 @@ use kali_type::{InferenceContext, Type, TypeInferenceError, Typed};
 use crate::literal::Literal;
 
 /// An expression in the Kali language.
+#[derive(Debug, Clone)]
 pub enum Expr {
     /// A literal value.
     Literal(Literal),
     /// An identifier.
     Identifier(String),
+}
+
+impl PartialEq for Expr {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Expr::Literal(a), Expr::Literal(b)) => a == b,
+            // identifiers are excluded - they are not values
+            _ => false,
+        }
+    }
 }
 
 impl Typed for Expr {
