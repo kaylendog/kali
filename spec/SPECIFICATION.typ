@@ -50,11 +50,20 @@ Kali is a simple, elegant, and powerful programming language. It is designed to 
 
 == Design Goals
 
+
 = Syntax
 
 == Data Types
 
 === Primitives
+
+Kali has support for six primitive data types:
+
+- Integers
+- Floating-point numbers
+- Booleans
+- Strings
+- Characters
 
 === Composite
 
@@ -63,7 +72,7 @@ Kali has support for four composite data types:
 - Product types
 - Sum types
 - Arrays
-- Structs
+- Records
 
 Composite data types are used to represent complex data structures, and are a fundamental part of the language.
 
@@ -87,7 +96,13 @@ let person = ("John", 30, true)
 The syntax for a tuple is as follows:
 
 ```ebnf
-tuple = "(" type ("," type)* ")"
+tuple = "(" type { "," type } ")"
+```
+
+The unit type is a special case of the tuple type, with no elements.
+
+```kali
+let unit = ()
 ```
 
 ==== Sum Types
@@ -98,11 +113,13 @@ Sum types are a composite data type that can hold one of several different value
 type Shape = Circle(Int) | Rectangle(Int, Int)
 ```
 
+Sum types support three types of variant: simple, tuple, and record.
+
 The syntax for a sum type is as follows:
 
 ```ebnf
 sum_type =  sum_type_variant ("|" sum_type_variant)*
-sum_type_variant = type ("(" type ("," type)* ")"
+sum_type_variant = type ("(" type ("," type)* ")")
 ```
 
 ==== Arrays
@@ -113,9 +130,41 @@ Arrays are a composite data type that can hold multiple values of the same type.
 let numbers = [1, 2, 3, 4, 5]
 ```
 
-==== Structs
+==== Records
 
-Structs are a convenient way to define named composite data types.
+Records are a convenient way to define named composite data types.
+
+```kali
+type Point = { x: Int, y: Int }
+```
+
+The syntax for a record is as follows:
+
+```ebnf
+record = "{" field { "," field } "}"
+field = identifier ":" type
+```
+
+=== Special
+
+There are a few special data types in Kali, which are used to represent special values.
+
+- Unit
+- Never
+
+==== Unit
+
+The unit type is a special data type that has only one value, also called `unit`. It is used to represent the absence of a value, or a value that is not interesting.
+
+```kali
+let unit = "()'
+```
+
+==== Never
+
+The never type is a special data type that has no values. It is used to represent a computation that never completes, or a value that can never be produced.
+
+It is often used to represent type errors, or to signal that type checking has failed.
 
 == Variables
 
@@ -125,11 +174,17 @@ Structs are a convenient way to define named composite data types.
 
 = Type System
 
+== Traits
+
+== Type Inferrence
+
 = Memory Management
 
 = Modules
 
 = Standard Library
+
+Kali comes with a standard library that provides a wide range of functionality, including data structures, algorithms, and utilities.
 
 = Interoperability
 
