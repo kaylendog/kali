@@ -1,0 +1,9 @@
+[package]
+name = "kali-parse"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+chumsky = "0.9"
+
+kali-ast = { path = "../kali-ast" }
