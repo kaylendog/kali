@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{io::Write, path::PathBuf};
 
 use clap::Parser;
 use kali_runtime::Runtime;
@@ -18,6 +18,9 @@ struct Args {
 enum SubCommand {
     #[clap(name = "run")]
     Run(Run),
+    #[clap(name = "repl")]
+    /// Start a REPL session.
+    Repl,
 }
 
 /// Run a Kali program.
@@ -45,5 +48,31 @@ fn main() {
 
             println!("{:?}", runtime.stack());
         }
+
+        SubCommand::Repl => loop {
+            // print prompt
+            print!("> ");
+            std::io::stdout().flush().unwrap();
+
+            // read input
+            let mut input = String::new();
+            std::io::stdin().read_line(&mut input).unwrap();
+
+            // parse and compile
+            let ast = kali_parse::parse_str(&input).unwrap();
+            let mut unit = kali_stack::StackTranslationUnit::new();
+            ast.compile(&mut unit);
+
+            // print stack machine
+            if args.verbose {
+                println!("{:?}", unit);
+            }
+
+            // execute
+            let mut runtime = Runtime::new(unit.into_inner());
+            runtime.run();
+            // print output
+            println!("{:?}", runtime.stack());
+        },
     }
 }

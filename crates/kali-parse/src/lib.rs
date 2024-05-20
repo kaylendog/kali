@@ -11,3 +11,8 @@ pub fn parse_file<P: AsRef<Path>>(path: P) -> Result<Expr, Box<dyn Error>> {
     let expr = grammar::ExprParser::new().parse(&input).unwrap();
     Ok(expr)
 }
+
+pub fn parse_str(input: &str) -> Result<Expr, Box<dyn Error>> {
+    let expr = grammar::ExprParser::new().parse(input).unwrap();
+    Ok(expr)
+}
