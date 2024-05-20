@@ -1,5 +1,10 @@
 //! A stack-based intermediate representation for the Kali language.
 
+mod arithmetic;
+mod control;
+mod logical;
+mod stack;
+
 use core::fmt;
 use std::fmt::{Debug, Formatter};
 

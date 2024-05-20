@@ -1,0 +1,18 @@
+pub enum LogicalOp {
+    LogicalAnd = 15,
+    LogicalOr,
+    LogicalNot,
+    LogicalXor,
+    IntEq,
+    IntNeq,
+    IntLt,
+    IntLe,
+    IntGt,
+    IntGe,
+    FloatEq,
+    FloatNeq,
+    FloatLt,
+    FloatLe,
+    FloatGt,
+    FloatGe,
+}

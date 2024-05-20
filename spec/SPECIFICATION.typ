@@ -71,7 +71,7 @@ Like most programming languages, Kali has support for a variety of primitive dat
 - Booleans
 - Strings
 
-==== Integers
+==== Integers <integers>
 
 Integers are whole numbers, and can be positive or negative.
 
@@ -260,7 +260,99 @@ Kali's type system is heavily inspired by that of TypeScript and OCaml, and is d
 
 == Type Inferrence
 
-= Memory Management
+= Execution Model
+
+Kali is a byte-code compiled language, which means that it is compiled to an intermediate representation that is then executed by a virtual machine.
+
+This section describes an abstract execution model for Kali programs, and how they should be executed by a Kali virtual machine.
+
+== Kali Virtual Machine
+
+The Kali virtual machine is a stack-based virtual machine that executes Kali byte-code. It is designed to be simple, efficient, and easy to implement.
+
+=== Stack Layout
+
+Kali's stack is laid out similar to that of C. The stack grows downwards, with the top of the stack being at a lower memory address than the bottom of the stack.
+
+=== Instructions
+
+The stack machine supports a wide range of instructions, including arithmetic, logical, and control flow instructions.
+
+Instructions may have at most one immediate operand, which can vary in size depending on the instruction.
+
+==== Arithmetic
+
+Kali has full support for arithemtic addition, subtraction, multiplication, and division with both integers and floats. As described in @integers, all integers are signed.
+
+The following stack machine instructions are supported:
+
+- `iadd`: Add two integers
+- `isub`: Subtract two integers
+- `imul`: Multiply two integers
+- `idiv`: Divide two integers
+- `imod`: Modulus of two integers
+- `ineg`: Negate an integer
+- `ipow`: Power of two integers
+- `fadd`: Add two floats
+- `fsub`: Subtract two floats
+- `fmul`: Multiply two floats
+- `fdiv`: Divide two floats
+- `fmod`: Modulus of two floats
+- `fneg`: Negate a float
+- `fpow`: Power of two floats
+- `fsqrt`: Square root of a float
+
+==== Logical
+
+The following stack machine instructions are supported on booleans:
+
+- `land`: Logical AND
+- `lor`: Logical OR
+- `lnot`: Logical NOT
+- `lxor`: Logical XOR
+
+The following stack machine instructions are supported on integers and floats:
+
+- `ieq`: Integer equality
+- `ineq`: Integer inequality
+- `ilt`: Integer less than
+- `ile`: Integer less than or equal
+- `igt`: Integer greater than
+- `ige`: Integer greater than or equal
+- `feq`: Float equality
+- `fneq`: Float inequality
+- `flt`: Float less than
+- `fle`: Float less than or equal
+- `fgt`: Float greater than
+- `fge`: Float greater than or equal
+
+==== Control Flow
+
+- `jmp`: Jump to an address in the current block
+- `jz`: Jump if zero
+- `jnz`: Jump if not zero
+- `call`: Call a function
+- `ret`: Return from a function
+- `halt`: Halt the virtual machine
+- `nop`: No operation
+
+==== Stack Manipulation
+
+- `ipush <int>`: Push an integer onto the stack
+- `fpush <float>`: Push a float onto the stack
+- `bpush <bool>`: Push a boolean onto the stack
+- `ld <addr>`: Load a value from memory and push it onto the stack
+- `ipop`: Pop a value from the stack
+
+== Bytecode
+
+Each instruction in the Kali byte-code is represented by a single byte, with an optional immediate operand, varying in size depending on the instruction.
+
+== Memory Management
+
+== Native Targets
+
+Kali's byte-code can be compiled to a variety of native targets. Since the code generator uses Cranelift, it can target a wide range of platforms, including x86, ARM, and WebAssembly.
 
 = Modules
 
