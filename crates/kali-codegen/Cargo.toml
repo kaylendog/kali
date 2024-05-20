@@ -1,0 +1,13 @@
+[package]
+name = "kali-codegen"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+kali-stack = { path = "../kali-stack" }
+kali-ast = { path = "../kali-ast" }
+
+cranelift = "0.107"
+cranelift-module = "0.107"
+cranelift-native = "0.107"
+cranelift-jit = "0.107"
