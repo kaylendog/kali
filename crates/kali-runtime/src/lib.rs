@@ -29,12 +29,23 @@ impl Runtime {
     /// Run the program.
     pub fn run(&mut self) {
         while self.pc < self.program.len() {
-            // annoying clone, TODO
-            let operator = { &self.program[self.pc].clone() };
-            println!("pc: {:?} stack: {:?}", self.pc, self.stack);
-            operator.execute(self);
-            self.pc += 1;
+            self.step();
         }
+    }
+
+    /// Run the program in debug mode.
+    pub fn run_debug(&mut self) {
+        while self.pc < self.program.len() {
+            println!("{:04} {:?}", self.pc, self.stack);
+            self.step();
+        }
+    }
+
+    /// Execute the next instruction.
+    pub fn step(&mut self) {
+        let operator = { &self.program[self.pc].clone() };
+        operator.execute(self);
+        self.pc += 1;
     }
 
     /// Get a reference to the stack.

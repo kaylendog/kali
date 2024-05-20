@@ -1,4 +1,4 @@
-use std::{io::Write, path::PathBuf};
+use std::path::PathBuf;
 
 use clap::Parser;
 use kali_runtime::Runtime;
@@ -52,6 +52,7 @@ fn main() {
 
         SubCommand::Repl => {
             let mut rl = DefaultEditor::new().expect("failed to initialise repl");
+            let mut verbose = args.verbose;
             loop {
                 let line = rl.readline("kali>> ");
                 match line {
@@ -62,6 +63,10 @@ fn main() {
 
                         match line.as_str() {
                             "quit" | "exit" | "q" => break,
+                            "debug" => {
+                                verbose = true;
+                                continue;
+                            }
                             _ => {}
                         }
 
@@ -74,13 +79,17 @@ fn main() {
                         ast.compile(&mut unit);
 
                         // print stack machine
-                        if args.verbose {
+                        if verbose {
                             println!("{:?}", unit);
                         }
 
                         // execute
                         let mut runtime = Runtime::new(unit.into_inner());
-                        runtime.run();
+                        if verbose {
+                            runtime.run_debug()
+                        } else {
+                            runtime.run()
+                        }
 
                         println!("{:?}", runtime.stack());
                     }
