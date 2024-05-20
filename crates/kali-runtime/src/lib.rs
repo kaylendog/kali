@@ -36,8 +36,9 @@ impl Runtime {
     /// Run the program in debug mode.
     pub fn run_debug(&mut self) {
         while self.pc < self.program.len() {
-            println!("{:04} {:?}", self.pc, self.stack);
+            print!("{:04} {:?}", self.pc, self.stack);
             self.step();
+            println!(" -> {:?}", self.stack);
         }
     }
 
@@ -68,6 +69,9 @@ impl Execute for Operator {
                 let address = runtime.variables.get(var).copied().unwrap();
                 let value = runtime.stack[address].clone();
                 runtime.stack.push(value);
+            }
+            Operator::Pop => {
+                runtime.stack.pop().unwrap();
             }
             Operator::BinaryOp(op) => match op {
                 BinaryOp::Add => {
@@ -288,12 +292,14 @@ impl Execute for Operator {
                 }
             },
             Operator::Jump(target) => {
-                runtime.pc = *target;
+                // need -1 because the pc will be incremented after this
+                runtime.pc = *target - 1;
             }
             Operator::ConditionalJump(target) => {
                 let condition = runtime.stack.pop().expect("missing condition");
                 if let Literal::Bool(true) = condition {
-                    runtime.pc = *target;
+                    // need -1 because the pc will be incremented after this
+                    runtime.pc = *target - 1;
                 }
             }
         }

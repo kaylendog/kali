@@ -20,6 +20,8 @@ pub enum Operator {
     Jump(usize),
     /// Jump conditionally to another instruction.
     ConditionalJump(usize),
+    /// Pop a value from the stack, discarding it.
+    Pop,
 }
 
 /// A translation unit in the stack-based intermediate representation.
@@ -135,8 +137,8 @@ impl Compile for Conditional {
         let otherwise_end_idx = unit.instructions.len();
 
         // fill in the jump targets
-        unit.instructions[jump_idx] = Operator::ConditionalJump(body_idx - 1);
-        unit.instructions[jump_idx + 1] = Operator::Jump(otherwise_idx - 1);
+        unit.instructions[jump_idx] = Operator::ConditionalJump(body_idx);
+        unit.instructions[jump_idx + 1] = Operator::Jump(otherwise_idx);
         unit.instructions[body_end_idx] = Operator::Jump(otherwise_end_idx);
     }
 }

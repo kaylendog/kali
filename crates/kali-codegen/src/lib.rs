@@ -86,7 +86,7 @@ trait Translate {
     ) {
         let pointer = module.target_config().pointer_type();
         let sp = builder.ins().get_stack_pointer(pointer);
-        // stack grows downwards, so we subtract the size
+        // stack grows downwards, so pushing decreases the stack pointer
         let sp_offset = builder.ins().iconst(pointer, size as i64);
         let sp = builder.ins().isub(sp, sp_offset);
         builder.ins().store(MemFlags::new(), value, sp, 0);
@@ -96,6 +96,7 @@ trait Translate {
     fn pop_value(&self, module: &JITModule, builder: &mut FunctionBuilder, size: usize) -> Value {
         let pointer = module.target_config().pointer_type();
         let sp = builder.ins().get_stack_pointer(pointer);
+        // stack grows downwards, so removing increases the stack pointer
         let sp_offset = builder.ins().iconst(pointer, size as i64);
         let sp = builder.ins().isub(sp, sp_offset);
         builder.ins().load(types::I64, MemFlags::new(), sp, 0)
@@ -224,6 +225,10 @@ impl Translate for Operator {
                 // the next block is the body - might need some help from the stack operations to know
                 // where it ends?
                 builder.switch_to_block(body);
+            }
+            Operator::Pop => {
+                // pop value from the stack
+                self.pop_value(&module, builder, 8);
             }
         }
     }
