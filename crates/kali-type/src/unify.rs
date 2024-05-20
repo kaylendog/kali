@@ -57,7 +57,7 @@ impl Unify for Type {
                 }
                 Ok(Type::Tuple(types))
             }
-            (Type::Struct(a), Type::Struct(b)) => {
+            (Type::Record(a), Type::Record(b)) => {
                 if a.len() != b.len() {
                     return Err(TypeUnificationError::MismatchedLength(a.len(), b.len()));
                 }
@@ -71,7 +71,7 @@ impl Unify for Type {
                     fields.push((a_name.clone(), a_type.unify(&b_type, &context)?));
                 }
 
-                Ok(Type::Struct(fields.into_iter().collect()))
+                Ok(Type::Record(fields.into_iter().collect()))
             }
             // otherwise, the types must be equal
             (x, y) => {
@@ -161,11 +161,11 @@ mod tests {
     #[test]
     fn unify_inferred_structs() {
         let int = Type::Constant(Constant::Int);
-        let struct_a = Type::Struct(BTreeMap::from_iter(vec![
+        let struct_a = Type::Record(BTreeMap::from_iter(vec![
             ("a".to_string(), Type::Infer("x".to_string())),
             ("b".to_string(), Type::Infer("y".to_string())),
         ]));
-        let struct_b = Type::Struct(BTreeMap::from_iter(vec![
+        let struct_b = Type::Record(BTreeMap::from_iter(vec![
             ("a".to_string(), int.clone()),
             ("b".to_string(), int.clone()),
         ]));
@@ -174,17 +174,17 @@ mod tests {
             struct_a
                 .unify(&struct_b, &InferenceContext::default())
                 .unwrap(),
-            Type::Struct(BTreeMap::from_iter(vec![
+            Type::Record(BTreeMap::from_iter(vec![
                 ("a".to_string(), int.clone()),
                 ("b".to_string(), int.clone()),
             ]))
         );
 
-        let struct_a = Type::Struct(BTreeMap::from_iter(vec![
+        let struct_a = Type::Record(BTreeMap::from_iter(vec![
             ("a".to_string(), Type::Infer("x".to_string())),
             ("b".to_string(), int.clone()),
         ]));
-        let struct_b = Type::Struct(BTreeMap::from_iter(vec![
+        let struct_b = Type::Record(BTreeMap::from_iter(vec![
             ("a".to_string(), int.clone()),
             ("b".to_string(), Type::Infer("y".to_string())),
         ]));
@@ -192,7 +192,7 @@ mod tests {
             struct_a
                 .unify(&struct_b, &InferenceContext::default())
                 .unwrap(),
-            Type::Struct(BTreeMap::from_iter(vec![
+            Type::Record(BTreeMap::from_iter(vec![
                 ("a".to_string(), int.clone()),
                 ("b".to_string(), int.clone()),
             ]))

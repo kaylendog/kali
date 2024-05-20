@@ -1,6 +1,6 @@
 use kali_type::{InferenceContext, Type, TypeInferenceError, Typed};
 
-use crate::{literal::Literal, BinaryExpr};
+use crate::{conditional::Conditional, literal::Literal, unary::UnaryExpr, BinaryExpr};
 
 /// An expression in the Kali language.
 #[derive(Debug, Clone)]
@@ -11,6 +11,10 @@ pub enum Expr {
     Identifier(String),
     /// A binary expression.
     BinaryExpr(BinaryExpr),
+    /// A unary expression.
+    UnaryExpr(UnaryExpr),
+    /// A conditional expression.
+    Conditional(Conditional),
 }
 
 impl PartialEq for Expr {
@@ -33,6 +37,8 @@ impl Typed for Expr {
                 .cloned()
                 .unwrap_or(Type::Infer(name.clone()))),
             Expr::BinaryExpr(binary_expr) => binary_expr.ty(context),
+            Expr::UnaryExpr(unary_expr) => unary_expr.ty(context),
+            Expr::Conditional(conditional) => conditional.ty(context),
         }
     }
 }

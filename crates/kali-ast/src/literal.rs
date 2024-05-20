@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use kali_type::{Constant, InferenceContext, Type, TypeInferenceError, Typed, Unify};
+use kali_type::{Constant, InferenceContext, Type, TypeInferenceError, Typed};
 
 use crate::expr::Expr;
 

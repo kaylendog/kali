@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use kali_ast::{Expr, BinaryExpr, BinaryOperator, Literal};
+use kali_ast::{Expr, BinaryExpr, BinaryOp, Literal, UnaryExpr, UnaryOp, Conditional};
 
 grammar;
 
@@ -57,19 +57,34 @@ Term: Expr = {
     "(" <Expr> ")"
 };
 
-ExponentOp: BinaryOperator = {
-    "**" => BinaryOperator::Exponentiate,
-};
-
-Exponent: Expr = {
-    Exponent ExponentOp Term => Expr::BinaryExpr(BinaryExpr::new(<>)),
+UnaryNegate: Expr = {
+    "-" <UnaryNegate> => Expr::UnaryExpr(UnaryExpr::new(UnaryOp::Negate, <>)),
     Term,
 };
 
-FactorOp: BinaryOperator = {
-    "*" => BinaryOperator::Multiply,
-    "/" => BinaryOperator::Divide,
-    "%" => BinaryOperator::Modulo,
+UnaryLogicalNot: Expr = {
+    "!" <UnaryLogicalNot> => Expr::UnaryExpr(UnaryExpr::new(UnaryOp::LogicalNot, <>)),
+    UnaryNegate,
+};
+
+UnaryBitwiseNot: Expr = {
+    "~" <UnaryBitwiseNot> => Expr::UnaryExpr(UnaryExpr::new(UnaryOp::BitwiseNot, <>)),
+    UnaryLogicalNot,
+};
+
+ExponentOp: BinaryOp = {
+    "**" => BinaryOp::Exponentiate,
+};
+
+Exponent: Expr = {
+    Exponent ExponentOp UnaryBitwiseNot => Expr::BinaryExpr(BinaryExpr::new(<>)),
+    UnaryBitwiseNot,
+};
+
+FactorOp: BinaryOp = {
+    "*" => BinaryOp::Multiply,
+    "/" => BinaryOp::Divide,
+    "%" => BinaryOp::Modulo,
 };
 
 Factor: Expr = {
@@ -77,9 +92,9 @@ Factor: Expr = {
     Exponent,
 };
 
-SumOp: BinaryOperator = {
-    "+" => BinaryOperator::Add,
-    "-" => BinaryOperator::Subtract,
+SumOp: BinaryOp = {
+    "+" => BinaryOp::Add,
+    "-" => BinaryOp::Subtract,
 };
 
 Sum: Expr = {
@@ -87,21 +102,26 @@ Sum: Expr = {
     Factor,
 };
 
-ShiftOp: BinaryOperator = {
-    "<<" => BinaryOperator::BitwiseShiftLeft,
-    ">>" => BinaryOperator::BitwiseShiftRight,
-};
-
-Shift: Expr = {
-    Shift ShiftOp Sum => Expr::BinaryExpr(BinaryExpr::new(<>)),
+Cons: Expr = {
+    <lhs:Cons> "::" <rhs:Sum> => Expr::BinaryExpr(BinaryExpr::new(lhs, BinaryOp::Concatenate, rhs)),
     Sum,
 };
 
-ComparatorOp: BinaryOperator = {
-    "<" => BinaryOperator::LessThan,
-    "<=" => BinaryOperator::LessThanOrEqual,
-    ">" => BinaryOperator::GreaterThan,
-    ">=" => BinaryOperator::GreaterThanOrEqual,
+ShiftOp: BinaryOp = {
+    "<<" => BinaryOp::BitwiseShiftLeft,
+    ">>" => BinaryOp::BitwiseShiftRight,
+};
+
+Shift: Expr = {
+    Shift ShiftOp Cons => Expr::BinaryExpr(BinaryExpr::new(<>)),
+    Cons,
+};
+
+ComparatorOp: BinaryOp = {
+    "<" => BinaryOp::LessThan,
+    "<=" => BinaryOp::LessThanOrEqual,
+    ">" => BinaryOp::GreaterThan,
+    ">=" => BinaryOp::GreaterThanOrEqual,
 };
 
 Comparator: Expr = {
@@ -109,9 +129,9 @@ Comparator: Expr = {
     Shift,
 };
 
-EqualityOp: BinaryOperator = {
-    "==" => BinaryOperator::Equal,
-    "!=" => BinaryOperator::NotEqual,
+EqualityOp: BinaryOp = {
+    "==" => BinaryOp::Equal,
+    "!=" => BinaryOp::NotEqual,
 };
 
 Equality: Expr = {
@@ -120,31 +140,36 @@ Equality: Expr = {
 };
 
 BitwiseAnd: Expr = {
-    <lhs:BitwiseAnd> "&" <rhs:Equality> => Expr::BinaryExpr(BinaryExpr::new(lhs, BinaryOperator::BitwiseAnd, rhs)),
+    <lhs:BitwiseAnd> "&" <rhs:Equality> => Expr::BinaryExpr(BinaryExpr::new(lhs, BinaryOp::BitwiseAnd, rhs)),
     Equality,
 };
 
 BitwiseXor: Expr = {
-    <lhs:BitwiseXor> "^" <rhs:BitwiseAnd> => Expr::BinaryExpr(BinaryExpr::new(lhs, BinaryOperator::BitwiseXor, rhs)),
+    <lhs:BitwiseXor> "^" <rhs:BitwiseAnd> => Expr::BinaryExpr(BinaryExpr::new(lhs, BinaryOp::BitwiseXor, rhs)),
     BitwiseAnd,
 };
 
 BitwiseOr: Expr = {
-    <lhs:BitwiseOr> "|" <rhs:BitwiseXor> => Expr::BinaryExpr(BinaryExpr::new(lhs, BinaryOperator::BitwiseOr, rhs)),
+    <lhs:BitwiseOr> "|" <rhs:BitwiseXor> => Expr::BinaryExpr(BinaryExpr::new(lhs, BinaryOp::BitwiseOr, rhs)),
     BitwiseXor,
 };
 
 LogicalAnd: Expr = {
-    <lhs:LogicalAnd> "&&" <rhs:BitwiseOr> => Expr::BinaryExpr(BinaryExpr::new(lhs, BinaryOperator::LogicalAnd, rhs)),
+    <lhs:LogicalAnd> "&&" <rhs:BitwiseOr> => Expr::BinaryExpr(BinaryExpr::new(lhs, BinaryOp::LogicalAnd, rhs)),
     BitwiseOr,
 };
 
 LogicalOr: Expr = {
-    <lhs:LogicalOr> "||" <rhs:LogicalAnd> => Expr::BinaryExpr(BinaryExpr::new(lhs, BinaryOperator::LogicalOr, rhs)),
+    <lhs:LogicalOr> "||" <rhs:LogicalAnd> => Expr::BinaryExpr(BinaryExpr::new(lhs, BinaryOp::LogicalOr, rhs)),
     LogicalAnd,
 };
 
+Conditional: Expr = {
+    "if" <Expr> "{" <Expr> "}" "else" "{" <Expr> "}" => Expr::Conditional(Conditional::new(<>)),
+    "if" <Expr> "{" <Expr> "}" "else" <Conditional> => Expr::Conditional(Conditional::new(<>)),
+};
+
 pub Expr: Expr = {
-    // Literal,
     LogicalOr,
+    Conditional
 };

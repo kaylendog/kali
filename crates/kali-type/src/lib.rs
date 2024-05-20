@@ -19,10 +19,12 @@ pub enum Type {
     Array(Box<Type>),
     /// A tuple type. Contains the types of the elements.
     Tuple(Vec<Type>),
-    /// A struct type. Contains the types of the fields.
-    Struct(BTreeMap<String, Type>),
+    /// A record type. Contains the types of the fields.
+    Record(BTreeMap<String, Type>),
     /// A parameterized type.
     Parameterized(String, Vec<Type>),
+    /// A function type. Contains the types of the parameters and the return type.
+    Function(Vec<Type>, Box<Type>),
     /// Represents a type that has not yet been inferred. Used during type checking.
     Infer(String),
     /// Represents an error in the type system.
@@ -44,4 +46,6 @@ pub enum Constant {
     String,
     /// A unit type.
     Unit,
+    /// A never type.
+    Never,
 }

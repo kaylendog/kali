@@ -17,6 +17,13 @@ pub enum TypeInferenceError {
     UnificationFailed(Type, Type, TypeUnificationError),
     /// Multiple errors occurred.
     Multiple(Vec<TypeInferenceError>),
+    /// A type mismatch occurred.
+    Mismatch {
+        /// The expected type.
+        expected: Type,
+        /// The found type.
+        found: Type,
+    },
 }
 
 impl TypeInferenceError {

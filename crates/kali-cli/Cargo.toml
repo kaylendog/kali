@@ -1,0 +1,11 @@
+[package]
+name = "kali-cli"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+kali-parse = { path = "../kali-parse" }
+kali-stack = { path = "../kali-stack" }
+kali-runtime = { path = "../kali-runtime" }
+
+clap = { version = "4", features = ["derive"] }

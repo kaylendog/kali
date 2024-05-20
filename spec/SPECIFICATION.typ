@@ -180,7 +180,7 @@ array_literal = "[" expr ("," expr)* "]"
 array_access = expr "[" expr "]"
 ```
 
-==== Structs
+==== Records
 
 Records are a convenient way to define named composite data types.
 

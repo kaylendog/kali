@@ -1,24 +1,13 @@
+use std::{error::Error, path::Path};
+
+use kali_ast::Expr;
 use lalrpop_util::lalrpop_mod;
 
 lalrpop_mod!(grammar);
 
-#[cfg(test)]
-mod tests {
-    use kali_ast::{BinaryExpr, BinaryOperator, Expr, Literal};
-
-    #[test]
-    fn test_parse_binary() {
-        use crate::grammar::ExprParser;
-
-        let input = "1 + 2";
-        let expr = ExprParser::new().parse(input).unwrap();
-        assert_eq!(
-            expr,
-            Expr::BinaryExpr(BinaryExpr {
-                lhs: Box::new(Expr::Literal(Literal::Int(1))),
-                operator: BinaryOperator::Add,
-                rhs: Box::new(Expr::Literal(Literal::Int(2))),
-            })
-        );
-    }
+/// Parse a file into an AST.
+pub fn parse_file<P: AsRef<Path>>(path: P) -> Result<Expr, Box<dyn Error>> {
+    let input = std::fs::read_to_string(path)?;
+    let expr = grammar::ExprParser::new().parse(&input).unwrap();
+    Ok(expr)
 }

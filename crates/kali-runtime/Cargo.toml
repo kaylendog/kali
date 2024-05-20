@@ -1,0 +1,8 @@
+[package]
+name = "kali-runtime"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+kali-ast = { path = "../kali-ast" }
+kali-stack = { path = "../kali-stack" }
