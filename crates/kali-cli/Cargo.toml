@@ -9,3 +9,4 @@ kali-stack = { path = "../kali-stack" }
 kali-runtime = { path = "../kali-runtime" }
 
 clap = { version = "4", features = ["derive"] }
+rustyline = "14"
