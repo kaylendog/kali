@@ -4,6 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-chumsky = "0.9"
+lalrpop-util = { version = "0.20.2", features = ["lexer", "unicode"] }
 
 kali-ast = { path = "../kali-ast" }
+
+[build-dependencies]
+lalrpop = "0.20.2"

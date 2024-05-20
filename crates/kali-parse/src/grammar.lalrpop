@@ -1,0 +1,150 @@
+use std::str::FromStr;
+
+use kali_ast::{Expr, BinaryExpr, BinaryOperator, Literal};
+
+grammar;
+
+Identifier: String = {
+    r"[a-zA-Z_][a-zA-Z0-9_]*" => <>.to_string(),
+};
+
+Int: i64 = {
+    r"-?[0-9]+" => i64::from_str(<>).unwrap(),
+};
+
+Float: f64 = {
+    r"-?[0-9]+\.[0-9]+" => f64::from_str(<>).unwrap(),
+};
+
+Bool: bool = {
+    "true" => true,
+    "false" => false,
+};
+
+String: String = {
+    r#""[^"]*""# => <>.to_string(),
+};
+
+Comma<T>: Vec<T> = { // (1)
+    <mut v:(<T> ",")*> <e:T?> => match e { // (2)
+        None => v,
+        Some(e) => {
+            v.push(e);
+            v
+        }
+    }
+};
+
+Array: Vec<Expr> = {
+    "[" <Comma<Expr>> "]" => <>,
+};
+
+Tuple: Vec<Expr> = {
+    "(" <Comma<Expr>> ")" => <>,
+};
+
+Literal: Literal = {
+    <x:Int> => Literal::Int(x),
+    <x:Float> => Literal::Float(x),
+    <x:Bool> => Literal::Bool(x),
+    <x:String> => Literal::String(x),
+    <x:Array> => Literal::Array(x),
+};
+
+Term: Expr = {
+    Literal => Expr::Literal(<>),
+    Identifier => Expr::Identifier(<>),
+    "(" <Expr> ")"
+};
+
+ExponentOp: BinaryOperator = {
+    "**" => BinaryOperator::Exponentiate,
+};
+
+Exponent: Expr = {
+    Exponent ExponentOp Term => Expr::BinaryExpr(BinaryExpr::new(<>)),
+    Term,
+};
+
+FactorOp: BinaryOperator = {
+    "*" => BinaryOperator::Multiply,
+    "/" => BinaryOperator::Divide,
+    "%" => BinaryOperator::Modulo,
+};
+
+Factor: Expr = {
+    Factor FactorOp Exponent => Expr::BinaryExpr(BinaryExpr::new(<>)),
+    Exponent,
+};
+
+SumOp: BinaryOperator = {
+    "+" => BinaryOperator::Add,
+    "-" => BinaryOperator::Subtract,
+};
+
+Sum: Expr = {
+    Sum SumOp Factor => Expr::BinaryExpr(BinaryExpr::new(<>)),
+    Factor,
+};
+
+ShiftOp: BinaryOperator = {
+    "<<" => BinaryOperator::BitwiseShiftLeft,
+    ">>" => BinaryOperator::BitwiseShiftRight,
+};
+
+Shift: Expr = {
+    Shift ShiftOp Sum => Expr::BinaryExpr(BinaryExpr::new(<>)),
+    Sum,
+};
+
+ComparatorOp: BinaryOperator = {
+    "<" => BinaryOperator::LessThan,
+    "<=" => BinaryOperator::LessThanOrEqual,
+    ">" => BinaryOperator::GreaterThan,
+    ">=" => BinaryOperator::GreaterThanOrEqual,
+};
+
+Comparator: Expr = {
+    Comparator ComparatorOp Shift => Expr::BinaryExpr(BinaryExpr::new(<>)),
+    Shift,
+};
+
+EqualityOp: BinaryOperator = {
+    "==" => BinaryOperator::Equal,
+    "!=" => BinaryOperator::NotEqual,
+};
+
+Equality: Expr = {
+    Equality EqualityOp Comparator => Expr::BinaryExpr(BinaryExpr::new(<>)),
+    Comparator,
+};
+
+BitwiseAnd: Expr = {
+    <lhs:BitwiseAnd> "&" <rhs:Equality> => Expr::BinaryExpr(BinaryExpr::new(lhs, BinaryOperator::BitwiseAnd, rhs)),
+    Equality,
+};
+
+BitwiseXor: Expr = {
+    <lhs:BitwiseXor> "^" <rhs:BitwiseAnd> => Expr::BinaryExpr(BinaryExpr::new(lhs, BinaryOperator::BitwiseXor, rhs)),
+    BitwiseAnd,
+};
+
+BitwiseOr: Expr = {
+    <lhs:BitwiseOr> "|" <rhs:BitwiseXor> => Expr::BinaryExpr(BinaryExpr::new(lhs, BinaryOperator::BitwiseOr, rhs)),
+    BitwiseXor,
+};
+
+LogicalAnd: Expr = {
+    <lhs:LogicalAnd> "&&" <rhs:BitwiseOr> => Expr::BinaryExpr(BinaryExpr::new(lhs, BinaryOperator::LogicalAnd, rhs)),
+    BitwiseOr,
+};
+
+LogicalOr: Expr = {
+    <lhs:LogicalOr> "||" <rhs:LogicalAnd> => Expr::BinaryExpr(BinaryExpr::new(lhs, BinaryOperator::LogicalOr, rhs)),
+    LogicalAnd,
+};
+
+pub Expr: Expr = {
+    // Literal,
+    LogicalOr,
+};

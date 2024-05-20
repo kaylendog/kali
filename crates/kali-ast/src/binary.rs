@@ -2,17 +2,44 @@ use kali_type::{InferenceContext, Type, TypeInferenceError, Typed, Unify};
 
 use crate::Expr;
 
+#[derive(Debug, Clone, Copy)]
 pub enum BinaryOperator {
     Add,
     Subtract,
     Multiply,
     Divide,
+    Exponentiate,
+    Modulo,
+    Equal,
+    NotEqual,
+    LessThan,
+    LessThanOrEqual,
+    GreaterThan,
+    GreaterThanOrEqual,
+    LogicalAnd,
+    LogicalOr,
+    BitwiseAnd,
+    BitwiseOr,
+    BitwiseXor,
+    BitwiseShiftLeft,
+    BitwiseShiftRight,
 }
 
+#[derive(Debug, Clone)]
 pub struct BinaryExpr {
-    lhs: Box<Expr>,
-    rhs: Box<Expr>,
-    operator: BinaryOperator,
+    pub lhs: Box<Expr>,
+    pub rhs: Box<Expr>,
+    pub operator: BinaryOperator,
+}
+
+impl BinaryExpr {
+    pub fn new(lhs: Expr, operator: BinaryOperator, rhs: Expr) -> Self {
+        Self {
+            lhs: Box::new(lhs),
+            rhs: Box::new(rhs),
+            operator,
+        }
+    }
 }
 
 impl Typed for BinaryExpr {

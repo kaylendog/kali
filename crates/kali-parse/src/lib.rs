@@ -1,8 +1,24 @@
-//! This crate provides a parser for the Kali language.
+use lalrpop_util::lalrpop_mod;
 
-mod expr;
-pub mod literal;
-mod util;
+lalrpop_mod!(grammar);
 
-pub use expr::expr;
-pub use literal::literal;
+#[cfg(test)]
+mod tests {
+    use kali_ast::{BinaryExpr, BinaryOperator, Expr, Literal};
+
+    #[test]
+    fn test_parse_binary() {
+        use crate::grammar::ExprParser;
+
+        let input = "1 + 2";
+        let expr = ExprParser::new().parse(input).unwrap();
+        assert_eq!(
+            expr,
+            Expr::BinaryExpr(BinaryExpr {
+                lhs: Box::new(Expr::Literal(Literal::Int(1))),
+                operator: BinaryOperator::Add,
+                rhs: Box::new(Expr::Literal(Literal::Int(2))),
+            })
+        );
+    }
+}
