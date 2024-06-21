@@ -1,3 +1,5 @@
+//! Expressions.
+
 use kali_type::{InferenceContext, Type, TypeInferenceError, Typed};
 
 use crate::{conditional::Conditional, literal::Literal, unary::UnaryExpr, BinaryExpr};

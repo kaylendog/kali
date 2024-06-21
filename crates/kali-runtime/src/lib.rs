@@ -1,3 +1,5 @@
+//! Implements a (mediocre) stack-based virtual machine for executing Kali code.
+
 use std::collections::BTreeMap;
 
 use kali_ast::{BinaryOp, Literal, UnaryOp};

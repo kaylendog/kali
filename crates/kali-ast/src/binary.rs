@@ -1,7 +1,10 @@
+//! Binary expressions and associated types.
+
 use kali_type::{InferenceContext, Type, TypeInferenceError, Typed, Unify};
 
 use crate::Expr;
 
+/// An enumeration of binary operators.
 #[derive(Debug, Clone, Copy)]
 pub enum BinaryOp {
     Add,
@@ -26,6 +29,7 @@ pub enum BinaryOp {
     Concatenate,
 }
 
+/// A binary expression.
 #[derive(Debug, Clone)]
 pub struct BinaryExpr {
     pub lhs: Box<Expr>,

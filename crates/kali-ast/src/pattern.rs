@@ -1,3 +1,9 @@
+//! Pattern matching.
+
+use std::collections::BTreeMap;
+
+use crate::Expr;
+
 /// Represents a pattern in the AST.
 pub enum Pattern {
     /// A wildcard pattern.
@@ -13,4 +19,9 @@ pub enum Pattern {
     Cons(Box<Pattern>, Box<Pattern>),
     /// A range pattern.
     Range(Box<Pattern>, Box<Pattern>),
+}
+
+/// A match expression.
+pub struct Match {
+    pub branches: BTreeMap<Pattern, Expr>,
 }

@@ -1,3 +1,5 @@
+//! Conditional expressions.
+
 use kali_type::{Constant, InferenceContext, Type, TypeInferenceError, Typed, Unify};
 
 use crate::Expr;

@@ -15,6 +15,7 @@ pub enum TypeExpr {
     Record(Vec<(String, TypeExpr)>),
 }
 
+/// An enumeration of literal constant types.
 pub enum ConstantType {
     Int,
     Float,
