@@ -14,7 +14,7 @@ pub struct InferenceContext {
 /// A type inference error.
 pub enum TypeInferenceError {
     /// Unification of types failed.
-    UnificationFailed(Type, Type, TypeUnificationError),
+    UnificationFailed(Vec<Type>, TypeUnificationError),
     /// Multiple errors occurred.
     Multiple(Vec<TypeInferenceError>),
     /// A type mismatch occurred.
@@ -51,4 +51,46 @@ impl TypeInferenceError {
 pub trait Typed {
     /// Returns the type of the value.
     fn ty(&self, context: &InferenceContext) -> Result<Type, TypeInferenceError>;
+
+    /// Infers the types of all items in a collection.
+    fn ty_all(
+        items: impl IntoIterator<Item = Self>,
+        context: &InferenceContext,
+    ) -> Result<Vec<Type>, TypeInferenceError>
+    where
+        Self: Sized,
+    {
+        let items = items.into_iter();
+        let (types, err) = items.map(|item| item.ty(context)).fold(
+            (vec![], None::<TypeInferenceError>),
+            |(mut types, err), ty| match ty {
+                Ok(ty) => {
+                    types.push(ty);
+                    (types, err)
+                }
+                Err(e) => (
+                    types,
+                    Some(match err {
+                        Some(err) => err.combine(e),
+                        None => e,
+                    }),
+                ),
+            },
+        );
+
+        if let Some(err) = err {
+            return Err(err);
+        }
+
+        Ok(types)
+    }
+}
+
+impl<T> Typed for &T
+where
+    T: Typed,
+{
+    fn ty(&self, context: &InferenceContext) -> Result<Type, TypeInferenceError> {
+        (*self).ty(context)
+    }
 }

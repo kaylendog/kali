@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use kali_type::{Constant, InferenceContext, Type, TypeInferenceError, Typed};
+use kali_type::{Constant, InferenceContext, Type, TypeInferenceError, Typed, Unify};
 
 use crate::expr::Expr;
 
@@ -50,44 +50,25 @@ impl Typed for Literal {
             Literal::String(_) => Type::Constant(Constant::String),
             Literal::Unit => Type::Constant(Constant::Unit),
             Literal::Array(exprs) => {
-                // infer types of all elements, keep track of errors
-                let (types, err) = exprs.iter().map(|expr| expr.ty(context)).fold(
-                    (vec![], None::<TypeInferenceError>),
-                    |(mut types, err), ty| match ty {
-                        Ok(ty) => {
-                            types.push(ty);
-                            (types, err)
-                        }
-                        Err(e) => (
-                            types,
-                            Some(match err {
-                                Some(err) => err.combine(e),
-                                None => e,
-                            }),
-                        ),
-                    },
-                );
-
-                // return error if any
-                if let Some(err) = err {
-                    return Err(err);
-                }
-
-                todo!("unify array types");
-
-                // // attempt to unify all types
-                // let ty = types
-                //     .into_iter()
-                //     // TODO: unique identifiers for uninferred types
-                //     .fold(Ok(Type::Infer(String::from("empty array"))), |acc, ty| {
-                //         acc.and_then(|acc| acc.unify(&ty, context))
-                //     })
-                //     .map_err(|error| TypeInferenceError::UnificationFailed((), (), ()))?;
-
-                // Type::Array(Box::new(ty))
+                // get the types of all elements
+                let types = Typed::ty_all(exprs, context)?;
+                // then unify
+                Unify::unify_all(types.clone(), context)
+                    .map_err(|e| TypeInferenceError::UnificationFailed(types, e))?
             }
-            Literal::Tuple(exprs) => todo!(),
-            Literal::Struct(fields) => todo!(),
+            Literal::Tuple(exprs) => Type::Tuple(
+                exprs
+                    .iter()
+                    .map(|expr| expr.ty(context))
+                    .collect::<Result<Vec<_>, _>>()?,
+            ),
+            Literal::Struct(fields) => {
+                let fields = fields
+                    .iter()
+                    .map(|(name, expr)| Ok((name.clone(), expr.ty(context)?)))
+                    .collect::<Result<BTreeMap<_, _>, _>>()?;
+                Type::Record(fields)
+            }
         })
     }
 }

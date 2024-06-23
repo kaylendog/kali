@@ -56,7 +56,6 @@ Conditional: Conditional = {
     "if" <cond:Expr> "{" <body:Expr> "}" "else" <tail:Conditional> => Conditional::new(cond, body, Expr::Conditional(tail)),
 };
 
-
 pub Expr: Expr = {
     #[precedence(level ="0")]
     "(" <Expr> ")",

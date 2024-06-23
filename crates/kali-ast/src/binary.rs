@@ -56,7 +56,7 @@ impl Typed for BinaryExpr {
         match (lhs, rhs) {
             (Ok(lhs), Ok(rhs)) => lhs
                 .unify(&rhs, &context)
-                .map_err(|error| TypeInferenceError::UnificationFailed(lhs, rhs, error)),
+                .map_err(|error| TypeInferenceError::UnificationFailed(vec![lhs, rhs], error)),
             (Err(lhs), Ok(_)) => Err(lhs),
             (Ok(_), Err(rhs)) => Err(rhs),
             (Err(lhs), Err(rhs)) => Err(lhs.combine(rhs)),

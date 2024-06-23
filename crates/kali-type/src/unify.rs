@@ -9,13 +9,23 @@ pub trait Unify {
     /// The context in which the types are being unified.
     type Context;
 
-    /// The error that occurs during unification.
-    type Error;
-
     /// Unifies two instances.
-    fn unify(&self, other: &Self, context: &Self::Context) -> Result<Self, Self::Error>
+    fn unify(&self, other: &Self, context: &Self::Context) -> Result<Self, TypeUnificationError>
     where
         Self: Sized;
+
+    /// Attempts to unify all instances in a collection.
+    fn unify_all(
+        items: impl IntoIterator<Item = Self>,
+        context: &Self::Context,
+    ) -> Result<Self, TypeUnificationError>
+    where
+        Self: Sized,
+    {
+        let mut iter = items.into_iter();
+        let first = iter.next().expect("unify_all called with empty iterator");
+        iter.try_fold(first, |a, b| a.unify(&b, context))
+    }
 }
 
 /// An error that occurs during unification of types.
@@ -31,9 +41,8 @@ pub enum TypeUnificationError {
 
 impl Unify for Type {
     type Context = InferenceContext;
-    type Error = TypeUnificationError;
 
-    fn unify(&self, other: &Self, context: &Self::Context) -> Result<Self, <Type as Unify>::Error>
+    fn unify(&self, other: &Self, context: &Self::Context) -> Result<Self, TypeUnificationError>
     where
         Self: Sized,
     {

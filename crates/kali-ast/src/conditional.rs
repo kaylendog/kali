@@ -50,7 +50,7 @@ impl Typed for Conditional {
 
         let unified_ty = body_ty
             .unify(&otherwise_ty, context)
-            .map_err(|e| TypeInferenceError::UnificationFailed(body_ty, otherwise_ty, e))?;
+            .map_err(|e| TypeInferenceError::UnificationFailed(vec![body_ty, otherwise_ty], e))?;
 
         Ok(unified_ty)
     }
