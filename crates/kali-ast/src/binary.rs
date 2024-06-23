@@ -1,6 +1,6 @@
 //! Binary expressions and associated types.
 
-use kali_type::{InferenceContext, Type, TypeInferenceError, Typed, Unify};
+use kali_type::{InferenceContext, Type, TypeInferenceError, Typed};
 
 use crate::Expr;
 
@@ -48,7 +48,7 @@ impl BinaryExpr {
 }
 
 impl Typed for BinaryExpr {
-    fn ty(&self, context: &InferenceContext) -> Result<Type, TypeInferenceError> {
+    fn ty(&self, context: &mut InferenceContext) -> Result<Type, TypeInferenceError> {
         // combine results
         let lhs = self.lhs.ty(context);
         let rhs = self.rhs.ty(context);

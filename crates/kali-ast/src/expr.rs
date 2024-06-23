@@ -30,11 +30,10 @@ impl PartialEq for Expr {
 }
 
 impl Typed for Expr {
-    fn ty(&self, context: &InferenceContext) -> Result<Type, TypeInferenceError> {
+    fn ty(&self, context: &mut InferenceContext) -> Result<Type, TypeInferenceError> {
         match self {
-            Expr::Literal(literal) => literal.ty(&context),
+            Expr::Literal(literal) => literal.ty(context),
             Expr::Identifier(name) => Ok(context
-                .variables
                 .get(name)
                 .cloned()
                 .unwrap_or(Type::Infer(name.clone()))),

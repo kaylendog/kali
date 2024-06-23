@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use kali_type::{Constant, InferenceContext, Type, TypeInferenceError, Typed, Unify};
+use kali_type::{Constant, InferenceContext, Type, TypeInferenceError, Typed};
 
 use crate::expr::Expr;
 
@@ -42,7 +42,7 @@ impl PartialEq for Literal {
 }
 
 impl Typed for Literal {
-    fn ty(&self, context: &InferenceContext) -> Result<Type, TypeInferenceError> {
+    fn ty(&self, context: &mut InferenceContext) -> Result<Type, TypeInferenceError> {
         Ok(match self {
             Literal::Int(_) => Type::Constant(Constant::Int),
             Literal::Float(_) => Type::Constant(Constant::Float),
@@ -51,9 +51,9 @@ impl Typed for Literal {
             Literal::Unit => Type::Constant(Constant::Unit),
             Literal::Array(exprs) => {
                 // get the types of all elements
-                let types = Typed::ty_all(exprs, context)?;
+                let types = Type::ty_all(exprs, context)?;
                 // then unify
-                Unify::unify_all(types.clone(), context)
+                Type::unify_all(&types, context)
                     .map_err(|e| TypeInferenceError::UnificationFailed(types, e))?
             }
             Literal::Tuple(exprs) => Type::Tuple(

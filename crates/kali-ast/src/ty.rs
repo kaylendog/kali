@@ -40,7 +40,7 @@ impl TypeExpr {
             TypeExpr::Function(params, ret) => {
                 let params = params.iter().map(|param| param.as_ty()).collect();
                 let ret = ret.as_ty();
-                Type::Function(params, Box::new(ret))
+                Type::Lambda(params, Box::new(ret))
             }
             TypeExpr::Tuple(types) => {
                 let types = types.iter().map(|ty| ty.as_ty()).collect();

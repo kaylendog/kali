@@ -5,7 +5,9 @@ use crate::Expr;
 /// A unary expression.
 #[derive(Debug, Clone)]
 pub struct UnaryExpr {
+    /// The operator.
     pub operator: UnaryOp,
+    /// The operand.
     pub inner: Box<Expr>,
 }
 
@@ -18,6 +20,7 @@ impl UnaryExpr {
     }
 }
 
+/// An enumeration of unary operators.
 #[derive(Debug, Clone, Copy)]
 pub enum UnaryOp {
     Negate,
@@ -26,7 +29,7 @@ pub enum UnaryOp {
 }
 
 impl Typed for UnaryExpr {
-    fn ty(&self, context: &InferenceContext) -> Result<Type, TypeInferenceError> {
+    fn ty(&self, context: &mut InferenceContext) -> Result<Type, TypeInferenceError> {
         self.inner.ty(context)
     }
 }

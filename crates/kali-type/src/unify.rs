@@ -4,30 +4,6 @@ use thiserror::Error;
 
 use crate::{InferenceContext, Type};
 
-/// A trait for types that can be unified.
-pub trait Unify {
-    /// The context in which the types are being unified.
-    type Context;
-
-    /// Unifies two instances.
-    fn unify(&self, other: &Self, context: &Self::Context) -> Result<Self, TypeUnificationError>
-    where
-        Self: Sized;
-
-    /// Attempts to unify all instances in a collection.
-    fn unify_all(
-        items: impl IntoIterator<Item = Self>,
-        context: &Self::Context,
-    ) -> Result<Self, TypeUnificationError>
-    where
-        Self: Sized,
-    {
-        let mut iter = items.into_iter();
-        let first = iter.next().expect("unify_all called with empty iterator");
-        iter.try_fold(first, |a, b| a.unify(&b, context))
-    }
-}
-
 /// An error that occurs during unification of types.
 #[derive(Error, Debug)]
 pub enum TypeUnificationError {
@@ -39,17 +15,19 @@ pub enum TypeUnificationError {
     MismatchedFields(String),
 }
 
-impl Unify for Type {
-    type Context = InferenceContext;
-
-    fn unify(&self, other: &Self, context: &Self::Context) -> Result<Self, TypeUnificationError>
+impl Type {
+    /// Unifies two types.
+    pub fn unify(
+        &self,
+        other: &Self,
+        context: &InferenceContext,
+    ) -> Result<Self, TypeUnificationError>
     where
         Self: Sized,
     {
         match (self, other) {
             // If either type is an inference type, return the other type.
             (Type::Infer(name), x) | (x, Type::Infer(name)) => context
-                .inferred
                 .get(name)
                 .map(|a| a.unify(&x, &context))
                 .unwrap_or(Ok(x.clone())),
@@ -95,13 +73,23 @@ impl Unify for Type {
             }
         }
     }
+
+    /// Attempts to unify all instances in a collection.
+    pub fn unify_all<'iter>(
+        items: impl IntoIterator<Item = &'iter Type>,
+        context: &InferenceContext,
+    ) -> Result<Self, TypeUnificationError> {
+        let mut iter = items.into_iter();
+        let first = iter.next().expect("unify_all called with empty iterator");
+        iter.try_fold(first.clone(), |acc, item| acc.unify(item, context))
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
 
-    use crate::{unify::Unify, Constant, InferenceContext, Type};
+    use crate::{Constant, InferenceContext, Type};
 
     #[test]
     fn unify_literals() {

@@ -24,7 +24,7 @@ pub enum Type {
     /// A parameterized type.
     Parameterized(String, Vec<Type>),
     /// A function type. Contains the types of the parameters and the return type.
-    Function(Vec<Type>, Box<Type>),
+    Lambda(Vec<Type>, Box<Type>),
     /// Represents a type that has not yet been inferred. Used during type checking.
     Infer(String),
     /// Represents an error in the type system.
@@ -48,4 +48,39 @@ pub enum Constant {
     Unit,
     /// A never type.
     Never,
+}
+
+impl Type {
+    /// Infers the types of all items in a collection.
+    pub fn ty_all<'iter, T>(
+        items: impl IntoIterator<Item = &'iter T>,
+        context: &mut InferenceContext,
+    ) -> Result<Vec<Type>, TypeInferenceError>
+    where
+        T: Typed + 'iter,
+    {
+        let items = items.into_iter();
+        let (types, err) = items.map(|item| item.ty(context)).fold(
+            (vec![], None::<TypeInferenceError>),
+            |(mut types, err), ty| match ty {
+                Ok(ty) => {
+                    types.push(ty);
+                    (types, err)
+                }
+                Err(e) => (
+                    types,
+                    Some(match err {
+                        Some(err) => err.combine(e),
+                        None => e,
+                    }),
+                ),
+            },
+        );
+
+        if let Some(err) = err {
+            return Err(err);
+        }
+
+        Ok(types)
+    }
 }

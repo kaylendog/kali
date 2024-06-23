@@ -1,14 +1,53 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 
 use crate::{Type, TypeUnificationError};
 
 /// The context in which a type is being checked.
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub struct InferenceContext {
-    /// The types of the variables in scope.
+    /// A list of frames in the context.
+    pub frames: Vec<Frame>,
+}
+
+impl Default for InferenceContext {
+    fn default() -> Self {
+        Self {
+            frames: vec![Frame::default()],
+        }
+    }
+}
+
+impl InferenceContext {
+    /// Push an empty frame onto the context.
+    pub fn push_frame(&mut self) {
+        self.frames.push(Frame::default());
+    }
+
+    /// Pop a frame from the context.
+    pub fn pop_frame(&mut self) {
+        self.frames.pop();
+    }
+
+    /// Looks up a variable in the context.
+    pub fn get(&self, name: &str) -> Option<&Type> {
+        for frame in self.frames.iter().rev() {
+            if let Some(ty) = frame.variables.get(name) {
+                return Some(ty);
+            }
+        }
+        None
+    }
+
+    /// Declares a variable in the context.
+    pub fn insert(&mut self, name: String, ty: Type) {
+        self.frames.last_mut().unwrap().variables.insert(name, ty);
+    }
+}
+
+/// A frame in the context.
+#[derive(Default, Debug)]
+pub struct Frame {
     pub variables: HashMap<String, Type>,
-    /// The types of inferred types.
-    pub inferred: BTreeMap<String, Type>,
 }
 
 /// A type inference error.
@@ -50,47 +89,14 @@ impl TypeInferenceError {
 /// Implemented on types that that have a type within the Kali language.
 pub trait Typed {
     /// Returns the type of the value.
-    fn ty(&self, context: &InferenceContext) -> Result<Type, TypeInferenceError>;
-
-    /// Infers the types of all items in a collection.
-    fn ty_all(
-        items: impl IntoIterator<Item = Self>,
-        context: &InferenceContext,
-    ) -> Result<Vec<Type>, TypeInferenceError>
-    where
-        Self: Sized,
-    {
-        let items = items.into_iter();
-        let (types, err) = items.map(|item| item.ty(context)).fold(
-            (vec![], None::<TypeInferenceError>),
-            |(mut types, err), ty| match ty {
-                Ok(ty) => {
-                    types.push(ty);
-                    (types, err)
-                }
-                Err(e) => (
-                    types,
-                    Some(match err {
-                        Some(err) => err.combine(e),
-                        None => e,
-                    }),
-                ),
-            },
-        );
-
-        if let Some(err) = err {
-            return Err(err);
-        }
-
-        Ok(types)
-    }
+    fn ty(&self, context: &mut InferenceContext) -> Result<Type, TypeInferenceError>;
 }
 
 impl<T> Typed for &T
 where
     T: Typed,
 {
-    fn ty(&self, context: &InferenceContext) -> Result<Type, TypeInferenceError> {
+    fn ty(&self, context: &mut InferenceContext) -> Result<Type, TypeInferenceError> {
         (*self).ty(context)
     }
 }

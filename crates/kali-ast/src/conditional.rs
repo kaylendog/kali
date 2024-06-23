@@ -1,6 +1,6 @@
 //! Conditional expressions.
 
-use kali_type::{Constant, InferenceContext, Type, TypeInferenceError, Typed, Unify};
+use kali_type::{Constant, InferenceContext, Type, TypeInferenceError, Typed};
 
 use crate::Expr;
 
@@ -34,7 +34,7 @@ impl PartialEq for Conditional {
 }
 
 impl Typed for Conditional {
-    fn ty(&self, context: &InferenceContext) -> Result<Type, TypeInferenceError> {
+    fn ty(&self, context: &mut InferenceContext) -> Result<Type, TypeInferenceError> {
         // ensure the condition is a boolean
         let condition_ty = self.condition.ty(context)?;
         if condition_ty != Type::Constant(Constant::Bool) {
