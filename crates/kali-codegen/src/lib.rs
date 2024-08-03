@@ -2,7 +2,7 @@ use cranelift::prelude::*;
 use cranelift_jit::{JITBuilder, JITModule};
 use cranelift_module::{DataDescription, Module};
 use kali_ast::{BinaryOp, Literal, UnaryOp};
-use kali_stack::Operator;
+use kali_ir::Operator;
 
 /// A stack translation unit.
 pub struct StackTranslationUnit {

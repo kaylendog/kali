@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 
 use clap::Parser;
-use kali_runtime::Runtime;
-use kali_stack::Compile;
+use kali_ir::Compile;
+use kali_vm::Runtime;
 use rustyline::DefaultEditor;
 
 /// Command line interface for the Kali programming language.
@@ -37,7 +37,7 @@ fn main() {
         SubCommand::Run(run) => {
             let ast = kali_parse::parse_file(&run.path).unwrap();
             // compile to stack machine
-            let mut unit = kali_stack::StackTranslationUnit::new();
+            let mut unit = kali_ir::StackTranslationUnit::new();
             ast.compile(&mut unit);
             // print stack machine
             if args.verbose {
@@ -75,7 +75,7 @@ fn main() {
                         let ast = kali_parse::parse_str(&line).unwrap();
 
                         // compile to stack machine
-                        let mut unit = kali_stack::StackTranslationUnit::new();
+                        let mut unit = kali_ir::StackTranslationUnit::new();
                         ast.compile(&mut unit);
 
                         // print stack machine

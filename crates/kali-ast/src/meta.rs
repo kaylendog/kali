@@ -7,7 +7,7 @@ use crate::Node;
 /// Empty metadata.
 pub struct Empty;
 
-/// Metadata containing a type.
+/// Metadata containing a type, used to memoise the result of type inference.
 pub struct TypeMetadata {
     /// The type of the node.
     pub ty: OnceCell<Type>,

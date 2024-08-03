@@ -3,7 +3,7 @@
 use std::collections::BTreeMap;
 
 use kali_ast::{BinaryOp, Literal, UnaryOp};
-use kali_stack::Operator;
+use kali_ir::Operator;
 
 /// A runtime for executing Kali code.
 pub struct Runtime {

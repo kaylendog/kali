@@ -5,8 +5,8 @@ edition = "2021"
 
 [dependencies]
 kali-parse = { path = "../kali-parse" }
-kali-stack = { path = "../kali-stack" }
-kali-runtime = { path = "../kali-runtime" }
+kali-ir = { path = "../kali-ir" }
+kali-vm = { path = "../kali-vm" }
 
 clap = { version = "4", features = ["derive"] }
 rustyline = "14"
