@@ -23,5 +23,6 @@ pub enum Pattern {
 
 /// A match expression.
 pub struct Match {
+    /// Branches of the match expression.
     pub branches: BTreeMap<Pattern, Expr>,
 }

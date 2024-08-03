@@ -1,6 +1,8 @@
+//! Literal values.
+
 use std::collections::BTreeMap;
 
-use kali_type::{Constant, InferenceContext, Type, TypeInferenceError, Typed};
+use kali_type::{Constant, InferenceContext, Type, TypeInferenceError, Typed, TypedIterator};
 
 use crate::expr::Expr;
 
@@ -49,45 +51,13 @@ impl Typed for Literal {
             Literal::Bool(_) => Type::Constant(Constant::Bool),
             Literal::String(_) => Type::Constant(Constant::String),
             Literal::Unit => Type::Constant(Constant::Unit),
-            Literal::Array(exprs) => {
-                // infer types of all elements, keep track of errors
-                let (types, err) = exprs.iter().map(|expr| expr.ty(context)).fold(
-                    (vec![], None::<TypeInferenceError>),
-                    |(mut types, err), ty| match ty {
-                        Ok(ty) => {
-                            types.push(ty);
-                            (types, err)
-                        }
-                        Err(e) => (
-                            types,
-                            Some(match err {
-                                Some(err) => err.combine(e),
-                                None => e,
-                            }),
-                        ),
-                    },
-                );
-
-                // return error if any
-                if let Some(err) = err {
-                    return Err(err);
-                }
-
-                todo!("unify array types");
-
-                // // attempt to unify all types
-                // let ty = types
-                //     .into_iter()
-                //     // TODO: unique identifiers for uninferred types
-                //     .fold(Ok(Type::Infer(String::from("empty array"))), |acc, ty| {
-                //         acc.and_then(|acc| acc.unify(&ty, context))
-                //     })
-                //     .map_err(|error| TypeInferenceError::UnificationFailed((), (), ()))?;
-
-                // Type::Array(Box::new(ty))
-            }
-            Literal::Tuple(exprs) => todo!(),
-            Literal::Struct(fields) => todo!(),
+            Literal::Array(exprs) => exprs.iter().fold_unify(context)?,
+            Literal::Tuple(exprs) => exprs
+                .iter()
+                .map_infer(context)
+                .collect::<Result<Vec<_>, _>>()
+                .map(Type::Tuple)?,
+            Literal::Struct(_fields) => todo!(),
         })
     }
 }

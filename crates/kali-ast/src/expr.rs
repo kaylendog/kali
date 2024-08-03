@@ -34,8 +34,7 @@ impl Typed for Expr {
         match self {
             Expr::Literal(literal) => literal.ty(&context),
             Expr::Identifier(name) => Ok(context
-                .variables
-                .get(name)
+                .variable(name)
                 .cloned()
                 .unwrap_or(Type::Infer(name.clone()))),
             Expr::BinaryExpr(binary_expr) => binary_expr.ty(context),

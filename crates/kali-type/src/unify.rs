@@ -40,8 +40,7 @@ impl Unify for Type {
         match (self, other) {
             // If either type is an inference type, return the other type.
             (Type::Infer(name), x) | (x, Type::Infer(name)) => context
-                .inferred
-                .get(name)
+                .variable(name)
                 .map(|a| a.unify(&x, &context))
                 .unwrap_or(Ok(x.clone())),
             // Arrays unify if their element types unify.

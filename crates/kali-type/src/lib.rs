@@ -2,9 +2,11 @@
 //!
 //! The `kali-type` crate provides the type system for the Kali language.
 
+mod iter;
 mod typed;
 mod unify;
 
+pub use iter::*;
 pub use typed::*;
 pub use unify::*;
 
