@@ -15,6 +15,8 @@ pub struct Context {
     pub scope: Vec<Scope>,
     /// The next inference variable counter.
     pub counter: Rc<RefCell<usize>>,
+    /// A map of inference types with known types.
+    pub inferred: HashMap<usize, Type>,
 }
 
 impl Default for Context {
@@ -30,6 +32,7 @@ impl Context {
         Self {
             scope: vec![Scope::new(counter.clone())],
             counter: counter.clone(),
+            inferred: HashMap::new(),
         }
     }
 
@@ -59,7 +62,10 @@ impl Context {
 
     /// Returns the type of a known type in the context.
     pub fn get_known(&self, name: &str) -> Option<&Type> {
-        self.scope().known.get(name)
+        self.scope
+            .iter()
+            .rev()
+            .find_map(|scope| scope.known.get(name))
     }
 
     /// Declares a known type in the context.
@@ -77,7 +83,7 @@ impl Context {
 
     /// Returns the type of an inferred type in the context.
     pub fn get_inferred(&self, idx: usize) -> Option<&Type> {
-        self.scope().inferred.get(&idx)
+        self.inferred.get(&idx)
     }
 
     /// Declares a variable in the current scope.
@@ -89,7 +95,7 @@ impl Context {
 
     /// Infers a new type in the current scope.
     pub fn infer(&mut self, idx: usize, real: Type) {
-        self.scope_mut().inferred.insert(idx, real);
+        self.inferred.insert(idx, real);
     }
 }
 
@@ -97,8 +103,7 @@ impl Context {
 pub struct Scope {
     /// A map of named types in the context.
     pub known: HashMap<String, Type>,
-    /// A map of inference types with known types.
-    pub inferred: HashMap<usize, Type>,
+
     /// A reference to the global inference counter.
     pub counter: Rc<RefCell<usize>>,
 }
@@ -107,7 +112,6 @@ impl Scope {
     pub fn new(counter: Rc<RefCell<usize>>) -> Self {
         Self {
             known: HashMap::new(),
-            inferred: HashMap::new(),
             counter,
         }
     }

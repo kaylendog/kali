@@ -5,6 +5,8 @@ use kali_ir::Compile;
 use kali_type::Typed;
 use kali_vm::Runtime;
 use rustyline::DefaultEditor;
+use tracing::level_filters::LevelFilter;
+use tracing_subscriber::EnvFilter;
 
 /// Command line interface for the Kali programming language.
 #[derive(Parser)]
@@ -35,6 +37,12 @@ struct Run {
 
 fn main() {
     let args = Args::parse();
+
+    // initialise tracing
+    let filter = EnvFilter::builder()
+        .with_default_directive(LevelFilter::ERROR.into())
+        .from_env_lossy();
+    tracing_subscriber::fmt().with_env_filter(filter).init();
 
     match args.subcommand {
         SubCommand::Run(run) => {
@@ -79,15 +87,10 @@ fn main() {
 
                         // assert stack is well typed
                         let mut ctx = kali_type::Context::default();
-                        let ty = match ast.ty(&mut ctx) {
-                            Ok(ty) => {
-                                if verbose {
-                                    println!("\nInferred Type: {:?}\n", ty);
-                                }
-                                ty
-                            }
-                            Err(err) => {
-                                eprintln!("Type Error: {:?}", err);
+                        let ty = match ast.ty(&mut ctx).and_then(|ty| ty.resolve(&mut ctx)) {
+                            Ok(ty) => ty,
+                            Err(e) => {
+                                eprintln!("Type Error: {}", e);
                                 continue;
                             }
                         };
@@ -96,6 +99,8 @@ fn main() {
                             eprintln!("Type Error: expected definite type, found {:?}", ty);
                             continue;
                         }
+
+                        println!("\nType: {:?}\n", ty);
 
                         // compile to stack machine
                         let mut unit = kali_ir::StackTranslationUnit::new();

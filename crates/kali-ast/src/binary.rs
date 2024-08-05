@@ -1,6 +1,6 @@
 //! Binary expressions and associated types.
 
-use kali_type::{Context, Type, TypeInferenceError, Typed};
+use kali_type::{Constant, Context, Type, TypeInferenceError, Typed};
 
 use crate::{Expr, Node};
 
@@ -56,6 +56,24 @@ impl Typed for BinaryExpr {
             // both ok
             (Ok(lhs), Ok(rhs)) => lhs
                 .unify(&rhs, context)
+                .and_then(|inner| match self.operator {
+                    BinaryOp::Equal
+                    | BinaryOp::NotEqual
+                    | BinaryOp::LessThan
+                    | BinaryOp::LessThanOrEqual
+                    | BinaryOp::GreaterThan
+                    | BinaryOp::GreaterThanOrEqual => {
+                        // require the inner type to be a constant
+                        inner
+                            .unify(&Type::Constant(Constant::Int), context)
+                            .map(|_| Type::Constant(Constant::Bool))
+                    }
+                    BinaryOp::LogicalAnd | BinaryOp::LogicalOr => {
+                        // require the inner type to be a boolean
+                        inner.unify(&Type::Constant(Constant::Bool), context)
+                    }
+                    _ => Ok(inner),
+                })
                 .map_err(|error| TypeInferenceError::UnificationFailed(lhs, rhs, error)),
             (Err(lhs), Ok(_)) => Err(lhs),
             (Ok(_), Err(rhs)) => Err(rhs),

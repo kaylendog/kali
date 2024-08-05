@@ -20,6 +20,7 @@ pub enum TypeUnificationError {
 
 impl Type {
     /// Unified two types.
+    #[tracing::instrument(skip(context))]
     pub fn unify(&self, other: &Self, context: &mut Context) -> Result<Self, TypeUnificationError> {
         trace!("unify");
         match (self, other) {

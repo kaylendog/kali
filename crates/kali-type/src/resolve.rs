@@ -2,11 +2,15 @@
 
 use std::collections::BTreeMap;
 
+use tracing::trace;
+
 use crate::{Context, Type, TypeInferenceError, TypeIterator};
 
 impl Type {
     /// Consume and attempt to resolve the type.
+    #[tracing::instrument]
     pub fn resolve(self, context: &mut Context) -> Result<Type, TypeInferenceError> {
+        trace!("resolve");
         Ok(match self {
             Type::Array(x) => Type::Array(Box::new(x.resolve(context)?)),
             Type::Tuple(types) => Type::Tuple(
