@@ -2,6 +2,8 @@
 
 use std::collections::BTreeMap;
 
+use kali_type::{Context, Type, TypeInferenceError, Typed};
+
 use crate::Expr;
 
 /// Represents a pattern in the AST.
@@ -25,4 +27,10 @@ pub enum Pattern {
 pub struct Match {
     /// Branches of the match expression.
     pub branches: BTreeMap<Pattern, Expr>,
+}
+
+impl Typed for Match {
+    fn ty(&self, context: &mut Context) -> Result<Type, TypeInferenceError> {
+        todo!()
+    }
 }

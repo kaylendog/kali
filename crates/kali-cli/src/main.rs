@@ -18,6 +18,7 @@ struct Args {
 
 #[derive(Parser)]
 enum SubCommand {
+    /// Run a Kali program.
     #[clap(name = "run")]
     Run(Run),
     #[clap(name = "repl")]

@@ -57,7 +57,6 @@ impl Typed for BinaryExpr {
             (Ok(lhs), Ok(rhs)) => lhs
                 .unify(&rhs, context)
                 .map_err(|error| TypeInferenceError::UnificationFailed(lhs, rhs, error)),
-            // handle errors
             (Err(lhs), Ok(_)) => Err(lhs),
             (Ok(_), Err(rhs)) => Err(rhs),
             (Err(lhs), Err(rhs)) => Err(lhs.combine(rhs)),

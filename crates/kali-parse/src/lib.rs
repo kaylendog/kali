@@ -8,8 +8,7 @@ lalrpop_mod!(grammar);
 /// Parse a file into an AST.
 pub fn parse_file<P: AsRef<Path>>(path: P) -> Result<Expr, Box<dyn Error>> {
     let input = std::fs::read_to_string(path)?;
-    let expr = grammar::ExprParser::new().parse(&input).unwrap();
-    Ok(expr)
+    parse_str(&input)
 }
 
 /// Parse a string into an AST.
