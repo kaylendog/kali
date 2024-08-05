@@ -1,6 +1,7 @@
 use kali_type::{Constant, Type};
 
 /// A type expression in the Kali language.
+#[derive(Debug, Clone)]
 pub enum TypeExpr {
     Constant(ConstantType),
     /// A type variable.
@@ -16,6 +17,7 @@ pub enum TypeExpr {
 }
 
 /// An enumeration of literal constant types.
+#[derive(Debug, Clone)]
 pub enum ConstantType {
     Int,
     Float,
@@ -36,11 +38,11 @@ impl TypeExpr {
                 ConstantType::Unit => Type::Constant(Constant::Unit),
                 ConstantType::Never => Type::Constant(Constant::Never),
             },
-            TypeExpr::Variable(name) => Type::Infer(name.clone()),
+            TypeExpr::Variable(_name) => todo!("TypeExpr::Variable"),
             TypeExpr::Function(params, ret) => {
                 let params = params.iter().map(|param| param.as_ty()).collect();
                 let ret = ret.as_ty();
-                Type::Function(params, Box::new(ret))
+                Type::Lambda(params, Box::new(ret))
             }
             TypeExpr::Tuple(types) => {
                 let types = types.iter().map(|ty| ty.as_ty()).collect();

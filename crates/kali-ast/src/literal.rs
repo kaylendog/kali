@@ -2,9 +2,9 @@
 
 use std::collections::BTreeMap;
 
-use kali_type::{Constant, InferenceContext, Type, TypeInferenceError, Typed, TypedIterator};
+use kali_type::{Constant, Context, Type, TypeInferenceError, Typed, TypedIterator};
 
-use crate::expr::Expr;
+use crate::{expr::Expr, Node};
 
 /// A literal value.
 #[derive(Debug, Clone)]
@@ -20,11 +20,11 @@ pub enum Literal {
     /// A unit literal.
     Unit,
     /// An array literal.
-    Array(Vec<Expr>),
+    Array(Vec<Node<Expr>>),
     /// A tuple literal.
-    Tuple(Vec<Expr>),
+    Tuple(Vec<Node<Expr>>),
     /// A struct literal.
-    Struct(BTreeMap<String, Expr>),
+    Struct(BTreeMap<String, Node<Expr>>),
 }
 
 impl PartialEq for Literal {
@@ -44,7 +44,7 @@ impl PartialEq for Literal {
 }
 
 impl Typed for Literal {
-    fn ty(&self, context: &InferenceContext) -> Result<Type, TypeInferenceError> {
+    fn ty(&self, context: &mut Context) -> Result<Type, TypeInferenceError> {
         Ok(match self {
             Literal::Int(_) => Type::Constant(Constant::Int),
             Literal::Float(_) => Type::Constant(Constant::Float),

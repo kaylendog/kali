@@ -1,8 +1,8 @@
 //! Unary expressions.
 
-use kali_type::{InferenceContext, Type, TypeInferenceError, Typed};
+use kali_type::{Context, Type, TypeInferenceError, Typed};
 
-use crate::Expr;
+use crate::{Expr, Node};
 
 /// A unary expression.
 #[derive(Debug, Clone)]
@@ -10,11 +10,11 @@ pub struct UnaryExpr {
     /// The unary operator.
     pub operator: UnaryOp,
     /// The inner expression.
-    pub inner: Box<Expr>,
+    pub inner: Box<Node<Expr>>,
 }
 
 impl UnaryExpr {
-    pub fn new(operator: UnaryOp, inner: Expr) -> Self {
+    pub fn new(operator: UnaryOp, inner: Node<Expr>) -> Self {
         Self {
             operator,
             inner: Box::new(inner),
@@ -34,7 +34,7 @@ pub enum UnaryOp {
 }
 
 impl Typed for UnaryExpr {
-    fn ty(&self, context: &InferenceContext) -> Result<Type, TypeInferenceError> {
+    fn ty(&self, context: &mut Context) -> Result<Type, TypeInferenceError> {
         self.inner.ty(context)
     }
 }

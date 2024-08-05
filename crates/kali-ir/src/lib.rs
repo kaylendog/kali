@@ -3,7 +3,7 @@
 use core::fmt;
 use std::fmt::{Debug, Formatter};
 
-use kali_ast::{BinaryExpr, BinaryOp, Conditional, Expr, Literal, UnaryExpr, UnaryOp};
+use kali_ast::{BinaryExpr, BinaryOp, Conditional, Expr, Literal, Node, UnaryExpr, UnaryOp};
 
 /// An instruction operating on the stack.
 #[derive(Debug, Clone)]
@@ -88,6 +88,15 @@ pub trait Compile {
     fn compile(&self, unit: &mut StackTranslationUnit);
 }
 
+impl<T> Compile for Node<T>
+where
+    T: Compile,
+{
+    fn compile(&self, unit: &mut StackTranslationUnit) {
+        self.inner.compile(unit);
+    }
+}
+
 impl Compile for Expr {
     fn compile(&self, unit: &mut StackTranslationUnit) {
         match self {
@@ -96,6 +105,7 @@ impl Compile for Expr {
             Expr::BinaryExpr(binary) => binary.compile(unit),
             Expr::UnaryExpr(unary) => unary.compile(unit),
             Expr::Conditional(conditional) => conditional.compile(unit),
+            Expr::Lambda(_) => todo!("lambda compilation"),
         }
     }
 }
@@ -131,7 +141,7 @@ impl Compile for Conditional {
         let body_end_idx = unit.instructions.len();
         unit.jump(0);
 
-        // comiple the otherwise branch, keeping track of where it begins
+        // compile the otherwise branch, keeping track of where it begins
         let otherwise_idx = unit.instructions.len();
         self.otherwise.compile(unit);
         let otherwise_end_idx = unit.instructions.len();

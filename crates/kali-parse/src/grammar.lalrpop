@@ -1,8 +1,12 @@
 use std::str::FromStr;
 
-use kali_ast::{Expr, BinaryExpr, BinaryOp, Literal, UnaryExpr, UnaryOp, Conditional};
+use kali_ast::{Expr, BinaryExpr, BinaryOp, Literal, UnaryExpr, UnaryOp, Conditional, Lambda, Node};
 
 grammar;
+
+Node<T>: Node<T> = {
+    <start:@L> <t:T> <end:@R> => Node::new(t, start..end),
+};
 
 Identifier: String = {
     r"[a-zA-Z_][a-zA-Z0-9_]*" => <>.to_string(),
@@ -25,7 +29,7 @@ String: String = {
     r#""[^"]*""# => <>.to_string(),
 };
 
-Comma<T>: Vec<T> = { // (1)
+Comma0<T>: Vec<T> = { // (1)
     <mut v:(<T> ",")*> <e:T?> => match e { // (2)
         None => v,
         Some(e) => {
@@ -35,12 +39,27 @@ Comma<T>: Vec<T> = { // (1)
     }
 };
 
-Array: Vec<Expr> = {
-    "[" <Comma<Expr>> "]" => <>,
+Comma1<T>: Vec<T> = {
+    <mut v:(<T> ",")*> <e:T> => {
+        v.push(e);
+        v
+    }
+}
+
+Comma2<T>: Vec<T> = {
+    <mut v:(<T> ",")+> <e:T> => {
+        v.push(e);
+        v
+    }
+}
+
+Array: Vec<Node<Expr>> = {
+    "[" <Comma0<Node<Expr>>> "]" => <>,
 };
 
-Tuple: Vec<Expr> = {
-    "(" <Comma<Expr>> ")" => <>,
+// tuples must have at least two elements to differentiate from a parenthesized expression
+Tuple: Vec<Node<Expr>> = {
+    "(" <Comma2<Node<Expr>>> ")" => <>,
 };
 
 Literal: Literal = {
@@ -49,13 +68,18 @@ Literal: Literal = {
     <x:Bool> => Literal::Bool(x),
     <x:String> => Literal::String(x),
     <x:Array> => Literal::Array(x),
+    <x:Tuple> => Literal::Tuple(x),
 };
 
 Conditional: Conditional = {
-    "if" <Expr> "{" <Expr> "}" "else" "{" <Expr> "}" => Conditional::new(<>),
-    "if" <cond:Expr> "{" <body:Expr> "}" "else" <tail:Conditional> => Conditional::new(cond, body, Expr::Conditional(tail)),
+    "if" <Node<Expr>> "{" <Node<Expr>> "}" "else" "{" <Node<Expr>> "}" => Conditional::new(<>),
+    "if" <cond:Node<Expr>> "{" <body:Node<Expr>> "}" "else" <l:@L> <tail:Conditional> <r:@R> => Conditional::new(cond, body, Node::new(Expr::Conditional(tail), l..r)),
 };
 
+Lambda: Lambda = {
+    // n args, body
+    "fn" <Comma1<Identifier>> "->" <Node<Expr>> => Lambda::new(<>),
+};
 
 pub Expr: Expr = {
     #[precedence(level ="0")]
@@ -64,45 +88,49 @@ pub Expr: Expr = {
     Identifier => Expr::Identifier(<>),
     Conditional => Expr::Conditional(<>),
     // unary
-    "!" <Expr> => Expr::UnaryExpr(UnaryExpr::new(UnaryOp::LogicalNot, <>)),
-    "~" <Expr> => Expr::UnaryExpr(UnaryExpr::new(UnaryOp::BitwiseNot, <>)),
-    "-" <Expr> => Expr::UnaryExpr(UnaryExpr::new(UnaryOp::Negate, <>)),
+    "!" <Node<Expr>> => Expr::UnaryExpr(UnaryExpr::new(UnaryOp::LogicalNot, <>)),
+    "~" <Node<Expr>> => Expr::UnaryExpr(UnaryExpr::new(UnaryOp::BitwiseNot, <>)),
+    "-" <Node<Expr>> => Expr::UnaryExpr(UnaryExpr::new(UnaryOp::Negate, <>)),
     // exp
     #[precedence(level ="1")] #[assoc(side="left")]
-    <lhs:Expr> "**" <rhs:Expr> => Expr::BinaryExpr(BinaryExpr::new(lhs, BinaryOp::Exponentiate, rhs)),
+    <lhs:Node<Expr>> "**" <rhs:Node<Expr>> => Expr::BinaryExpr(BinaryExpr::new(lhs, BinaryOp::Exponentiate, rhs)),
     // mul, div, mod
     #[precedence(level ="2")] #[assoc(side="left")]
-    <lhs:Expr> "*" <rhs:Expr> => Expr::BinaryExpr(BinaryExpr::new(lhs, BinaryOp::Multiply, rhs)),
-    <lhs:Expr> "/" <rhs:Expr> => Expr::BinaryExpr(BinaryExpr::new(lhs, BinaryOp::Divide, rhs)),
-    <lhs:Expr> "%" <rhs:Expr> => Expr::BinaryExpr(BinaryExpr::new(lhs, BinaryOp::Modulo, rhs)),
+    <lhs:Node<Expr>> "*" <rhs:Node<Expr>> => Expr::BinaryExpr(BinaryExpr::new(lhs, BinaryOp::Multiply, rhs)),
+    <lhs:Node<Expr>> "/" <rhs:Node<Expr>> => Expr::BinaryExpr(BinaryExpr::new(lhs, BinaryOp::Divide, rhs)),
+    <lhs:Node<Expr>> "%" <rhs:Node<Expr>> => Expr::BinaryExpr(BinaryExpr::new(lhs, BinaryOp::Modulo, rhs)),
     // add, sub
     #[precedence(level ="3")] #[assoc(side="left")]
-    <lhs:Expr> "+" <rhs:Expr> => Expr::BinaryExpr(BinaryExpr::new(lhs, BinaryOp::Add, rhs)),
-    <lhs:Expr> "-" <rhs:Expr> => Expr::BinaryExpr(BinaryExpr::new(lhs, BinaryOp::Subtract, rhs)),
+    <lhs:Node<Expr>> "+" <rhs:Node<Expr>> => Expr::BinaryExpr(BinaryExpr::new(lhs, BinaryOp::Add, rhs)),
+    <lhs:Node<Expr>> "-" <rhs:Node<Expr>> => Expr::BinaryExpr(BinaryExpr::new(lhs, BinaryOp::Subtract, rhs)),
     // logical ops
     #[precedence(level ="4")] #[assoc(side="left")]
-    <lhs:Expr> "&&" <rhs:Expr> => Expr::BinaryExpr(BinaryExpr::new(lhs, BinaryOp::LogicalAnd, rhs)),
-    <lhs:Expr> "||" <rhs:Expr> => Expr::BinaryExpr(BinaryExpr::new(lhs, BinaryOp::LogicalOr, rhs)),
+    <lhs:Node<Expr>> "&&" <rhs:Node<Expr>> => Expr::BinaryExpr(BinaryExpr::new(lhs, BinaryOp::LogicalAnd, rhs)),
+    <lhs:Node<Expr>> "||" <rhs:Node<Expr>> => Expr::BinaryExpr(BinaryExpr::new(lhs, BinaryOp::LogicalOr, rhs)),
     // bitwise ops
     #[precedence(level ="5")] #[assoc(side="left")]
-    <lhs:Expr> "&" <rhs:Expr> => Expr::BinaryExpr(BinaryExpr::new(lhs, BinaryOp::BitwiseAnd, rhs)),
-    <lhs:Expr> "^" <rhs:Expr> => Expr::BinaryExpr(BinaryExpr::new(lhs, BinaryOp::BitwiseXor, rhs)),
-    <lhs:Expr> "|" <rhs:Expr> => Expr::BinaryExpr(BinaryExpr::new(lhs, BinaryOp::BitwiseOr, rhs)),
+    <lhs:Node<Expr>> "&" <rhs:Node<Expr>> => Expr::BinaryExpr(BinaryExpr::new(lhs, BinaryOp::BitwiseAnd, rhs)),
+    <lhs:Node<Expr>> "^" <rhs:Node<Expr>> => Expr::BinaryExpr(BinaryExpr::new(lhs, BinaryOp::BitwiseXor, rhs)),
+    <lhs:Node<Expr>> "|" <rhs:Node<Expr>> => Expr::BinaryExpr(BinaryExpr::new(lhs, BinaryOp::BitwiseOr, rhs)),
     // shift ops
     #[precedence(level ="6")] #[assoc(side="left")]
-    <lhs:Expr> "<<" <rhs:Expr> => Expr::BinaryExpr(BinaryExpr::new(lhs, BinaryOp::BitwiseShiftLeft, rhs)),
-    <lhs:Expr> ">>" <rhs:Expr> => Expr::BinaryExpr(BinaryExpr::new(lhs, BinaryOp::BitwiseShiftRight, rhs)),
+    <lhs:Node<Expr>> "<<" <rhs:Node<Expr>> => Expr::BinaryExpr(BinaryExpr::new(lhs, BinaryOp::BitwiseShiftLeft, rhs)),
+    <lhs:Node<Expr>> ">>" <rhs:Node<Expr>> => Expr::BinaryExpr(BinaryExpr::new(lhs, BinaryOp::BitwiseShiftRight, rhs)),
     // comp ops
     #[precedence(level ="7")] #[assoc(side="left")]
-    <lhs:Expr> "<" <rhs:Expr> => Expr::BinaryExpr(BinaryExpr::new(lhs, BinaryOp::LessThan, rhs)),
-    <lhs:Expr> "<=" <rhs:Expr> => Expr::BinaryExpr(BinaryExpr::new(lhs, BinaryOp::LessThanOrEqual, rhs)),
-    <lhs:Expr> ">" <rhs:Expr> => Expr::BinaryExpr(BinaryExpr::new(lhs, BinaryOp::GreaterThan, rhs)),
-    <lhs:Expr> ">=" <rhs:Expr> => Expr::BinaryExpr(BinaryExpr::new(lhs, BinaryOp::GreaterThanOrEqual, rhs)),
+    <lhs:Node<Expr>> "<" <rhs:Node<Expr>> => Expr::BinaryExpr(BinaryExpr::new(lhs, BinaryOp::LessThan, rhs)),
+    <lhs:Node<Expr>> "<=" <rhs:Node<Expr>> => Expr::BinaryExpr(BinaryExpr::new(lhs, BinaryOp::LessThanOrEqual, rhs)),
+    <lhs:Node<Expr>> ">" <rhs:Node<Expr>> => Expr::BinaryExpr(BinaryExpr::new(lhs, BinaryOp::GreaterThan, rhs)),
+    <lhs:Node<Expr>> ">=" <rhs:Node<Expr>> => Expr::BinaryExpr(BinaryExpr::new(lhs, BinaryOp::GreaterThanOrEqual, rhs)),
     // eq ops
     #[precedence(level ="8")] #[assoc(side="left")]
-    <lhs:Expr> "==" <rhs:Expr> => Expr::BinaryExpr(BinaryExpr::new(lhs, BinaryOp::Equal, rhs)),
-    <lhs:Expr> "!=" <rhs:Expr> => Expr::BinaryExpr(BinaryExpr::new(lhs, BinaryOp::NotEqual, rhs)),
+    <lhs:Node<Expr>> "==" <rhs:Node<Expr>> => Expr::BinaryExpr(BinaryExpr::new(lhs, BinaryOp::Equal, rhs)),
+    <lhs:Node<Expr>> "!=" <rhs:Node<Expr>> => Expr::BinaryExpr(BinaryExpr::new(lhs, BinaryOp::NotEqual, rhs)),
     // cons
     #[precedence(level ="9")] #[assoc(side="right")]
-    <lhs:Expr> "::" <rhs:Expr> => Expr::BinaryExpr(BinaryExpr::new(lhs, BinaryOp::Concatenate, rhs)),
+    <lhs:Node<Expr>> "::" <rhs:Node<Expr>> => Expr::BinaryExpr(BinaryExpr::new(lhs, BinaryOp::Concatenate, rhs)),
+    // lambda
+    #[precedence(level ="10")] #[assoc(side="right")]
+    Lambda => Expr::Lambda(<>),
 };
+ 

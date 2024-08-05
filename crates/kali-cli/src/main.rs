@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use clap::Parser;
 use kali_ir::Compile;
+use kali_type::Typed;
 use kali_vm::Runtime;
 use rustyline::DefaultEditor;
 
@@ -27,6 +28,7 @@ enum SubCommand {
 /// Run a Kali program.
 #[derive(Parser)]
 struct Run {
+    /// Path to the Kali program.
     path: PathBuf,
 }
 
@@ -73,6 +75,26 @@ fn main() {
                         rl.add_history_entry(line.as_str())
                             .expect("failed to add history entry");
                         let ast = kali_parse::parse_str(&line).unwrap();
+
+                        // assert stack is well typed
+                        let mut ctx = kali_type::Context::default();
+                        let ty = match ast.ty(&mut ctx) {
+                            Ok(ty) => {
+                                if verbose {
+                                    println!("\nInferred Type: {:?}\n", ty);
+                                }
+                                ty
+                            }
+                            Err(err) => {
+                                eprintln!("Type Error: {:?}", err);
+                                continue;
+                            }
+                        };
+
+                        if !ty.is_monotype() {
+                            eprintln!("Type Error: expected definite type, found {:?}", ty);
+                            continue;
+                        }
 
                         // compile to stack machine
                         let mut unit = kali_ir::StackTranslationUnit::new();

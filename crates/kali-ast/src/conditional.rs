@@ -1,22 +1,22 @@
 //! Conditional expressions.
 
-use kali_type::{Constant, InferenceContext, Type, TypeInferenceError, Typed, Unify};
+use kali_type::{Constant, Context, Type, TypeInferenceError, Typed};
 
-use crate::Expr;
+use crate::{Expr, Node};
 
 /// A conditional expression.
 #[derive(Debug, Clone)]
 pub struct Conditional {
     /// The condition to check.
-    pub condition: Box<Expr>,
+    pub condition: Box<Node<Expr>>,
     /// The body of the conditional.
-    pub body: Box<Expr>,
+    pub body: Box<Node<Expr>>,
     /// The body of the else branch.
-    pub otherwise: Box<Expr>,
+    pub otherwise: Box<Node<Expr>>,
 }
 
 impl Conditional {
-    pub fn new(condition: Expr, body: Expr, otherwise: Expr) -> Self {
+    pub fn new(condition: Node<Expr>, body: Node<Expr>, otherwise: Node<Expr>) -> Self {
         Self {
             condition: Box::new(condition),
             body: Box::new(body),
@@ -34,7 +34,7 @@ impl PartialEq for Conditional {
 }
 
 impl Typed for Conditional {
-    fn ty(&self, context: &InferenceContext) -> Result<Type, TypeInferenceError> {
+    fn ty(&self, context: &mut Context) -> Result<Type, TypeInferenceError> {
         // ensure the condition is a boolean
         let condition_ty = self.condition.ty(context)?;
         if condition_ty != Type::Constant(Constant::Bool) {

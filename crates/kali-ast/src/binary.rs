@@ -1,8 +1,8 @@
 //! Binary expressions and associated types.
 
-use kali_type::{InferenceContext, Type, TypeInferenceError, Typed, Unify};
+use kali_type::{Context, Type, TypeInferenceError, Typed};
 
-use crate::Expr;
+use crate::{Expr, Node};
 
 /// An enumeration of binary operators.
 #[derive(Debug, Clone, Copy)]
@@ -33,15 +33,15 @@ pub enum BinaryOp {
 #[derive(Debug, Clone)]
 pub struct BinaryExpr {
     /// The left-hand side of the expression.
-    pub lhs: Box<Expr>,
+    pub lhs: Box<Node<Expr>>,
     /// The right-hand side of the expression.
-    pub rhs: Box<Expr>,
+    pub rhs: Box<Node<Expr>>,
     /// The binary operator.
     pub operator: BinaryOp,
 }
 
 impl BinaryExpr {
-    pub fn new(lhs: Expr, operator: BinaryOp, rhs: Expr) -> Self {
+    pub fn new(lhs: Node<Expr>, operator: BinaryOp, rhs: Node<Expr>) -> Self {
         Self {
             lhs: Box::new(lhs),
             rhs: Box::new(rhs),
@@ -51,11 +51,11 @@ impl BinaryExpr {
 }
 
 impl Typed for BinaryExpr {
-    fn ty(&self, context: &InferenceContext) -> Result<Type, TypeInferenceError> {
+    fn ty(&self, context: &mut Context) -> Result<Type, TypeInferenceError> {
         match (self.lhs.ty(context), self.rhs.ty(context)) {
             // both ok
             (Ok(lhs), Ok(rhs)) => lhs
-                .unify(&rhs, &context)
+                .unify(&rhs, context)
                 .map_err(|error| TypeInferenceError::UnificationFailed(lhs, rhs, error)),
             // handle errors
             (Err(lhs), Ok(_)) => Err(lhs),

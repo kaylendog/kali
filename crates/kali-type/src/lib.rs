@@ -1,16 +1,15 @@
-//! # kali-type
-//!
-//! The `kali-type` crate provides the type system for the Kali language.
+//! Provides a type system for the Kali language loosely based on the Hindley-Milner type system.
 
+use std::{collections::BTreeMap, fmt::Display};
+
+mod infer;
 mod iter;
-mod typed;
+mod resolve;
 mod unify;
 
+pub use infer::*;
 pub use iter::*;
-pub use typed::*;
 pub use unify::*;
-
-use std::collections::BTreeMap;
 
 /// A type in the Kali language.
 #[derive(Clone, Debug, PartialEq)]
@@ -25,29 +24,105 @@ pub enum Type {
     Record(BTreeMap<String, Type>),
     /// A parameterized type.
     Parameterized(String, Vec<Type>),
-    /// A function type. Contains the types of the parameters and the return type.
-    Function(Vec<Type>, Box<Type>),
-    /// Represents a type that has not yet been inferred. Used during type checking.
-    Infer(String),
+    /// A lambda type. Contains the types of the parameters and the return type.
+    Lambda(Vec<Type>, Box<Type>),
+    /// Represents a type that has not yet been inferred, with a unique ID.
+    Infer(usize),
     /// Represents an error in the type system.
     Error,
 }
 
+impl Type {
+    /// Returns whether the type is a monotype, i.e. a constant type, or a type constructor with monotype parameters recursively.
+    pub fn is_monotype(&self) -> bool {
+        match self {
+            Type::Constant(_) => true,
+            Type::Array(ty) => ty.is_monotype(),
+            Type::Tuple(types) => types.iter().all(|ty| ty.is_monotype()),
+            Type::Record(fields) => fields.values().all(|ty| ty.is_monotype()),
+            Type::Parameterized(_, types) => types.iter().all(|ty| ty.is_monotype()),
+            Type::Lambda(params, ret) => {
+                params.iter().all(|ty| ty.is_monotype()) && ret.is_monotype()
+            }
+            _ => false,
+        }
+    }
+}
+
+impl Display for Type {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Type::Constant(constant) => write!(f, "{}", constant),
+            Type::Array(ty) => write!(f, "{}[]", ty),
+            Type::Tuple(types) => {
+                write!(f, "(")?;
+                for (i, ty) in types.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{}", ty)?;
+                }
+                write!(f, ")")
+            }
+            Type::Record(_) => todo!(),
+            Type::Parameterized(_, _) => todo!(),
+            Type::Lambda(params, body) => {
+                write!(f, "(")?;
+                for (i, ty) in params.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{}", ty)?;
+                }
+                write!(f, ") -> {}", body)
+            }
+            Type::Infer(id) => write!(f, "'{}", id),
+            Type::Error => write!(f, "error"),
+        }
+    }
+}
+
 /// Constant types in the Kali language.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, strum::Display)]
 pub enum Constant {
     /// A signed integer type.
+    #[strum(serialize = "int")]
     Int,
     /// An unsigned integer type.
+    #[strum(serialize = "unsigned int")]
     UnsignedInt,
     /// A floating-point type.
+    #[strum(serialize = "float")]
     Float,
     /// A boolean type.
+    #[strum(serialize = "bool")]
     Bool,
     /// A string type.
+    #[strum(serialize = "string")]
     String,
     /// A unit type.
+    #[strum(serialize = "()")]
     Unit,
     /// A never type.
+    #[strum(serialize = "!")]
     Never,
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn display() {
+        assert_eq!(
+            format!("{}", crate::Type::Constant(crate::Constant::Int)),
+            "int"
+        );
+        // array
+        assert_eq!(
+            format!(
+                "{}",
+                crate::Type::Array(Box::new(crate::Type::Constant(crate::Constant::Int)))
+            ),
+            "int[]"
+        );
+    }
 }

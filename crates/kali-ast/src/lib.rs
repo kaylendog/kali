@@ -2,7 +2,7 @@
 //!
 //! This crate provides the abstract syntax tree (AST) for the Kali language.
 
-use std::fmt::{Debug, Display};
+use std::{fmt::Debug, ops::Range};
 
 mod attr;
 mod binary;
@@ -21,50 +21,43 @@ pub use conditional::*;
 pub use expr::*;
 pub use func::*;
 pub use literal::*;
+pub use meta::*;
 pub use pattern::*;
 pub use ty::*;
 pub use unary::*;
 
 /// A node in the AST, with an associated span and metadata.
 #[derive(Debug, Clone)]
-pub struct Node<'src, T, M> {
+pub struct Node<T> {
     /// The inner node.
     pub inner: T,
     /// Metadata associated with the node.
-    pub meta: M,
+    pub meta: Meta,
     /// The span of the node in the source code.
-    pub span: &'src str,
+    pub span: Range<usize>,
 }
 
-/// A span in the source code.
-#[derive(Debug, Clone, Copy)]
-pub struct Span<'src> {
-    /// The start index of the span.
-    pub start: usize,
-    /// The end index of the span.
-    pub end: usize,
-    /// The source code.
-    pub src: &'src str,
-}
-
-impl<'src> Span<'src> {
-    /// Creates a new span from a start and end index.
-    pub fn new(start: usize, end: usize, src: &'src str) -> Self {
-        Self { start, end, src }
+impl<T> Node<T> {
+    /// Create a new node with no metadata.
+    pub fn new(inner: T, span: Range<usize>) -> Self {
+        Self {
+            inner,
+            meta: Meta::default(),
+            span,
+        }
     }
 
-    /// Returns the span as a string slice.
-    pub fn as_str(&self) -> &'src str {
-        &self.src[self.start..self.end]
-    }
-
-    pub fn len(&self) -> usize {
-        self.end - self.start
+    /// Return this node's span as a slice of the given source.
+    pub fn as_str<'a>(&'a self, source: &'a str) -> &'a str {
+        &source[self.span.clone()]
     }
 }
 
-impl Display for Span<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.as_str())
+impl<T> PartialEq for Node<T>
+where
+    T: PartialEq,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.inner == other.inner
     }
 }

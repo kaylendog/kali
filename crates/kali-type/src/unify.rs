@@ -1,22 +1,11 @@
 //! Unification of types.
 
+use std::cmp::Ordering;
+
 use thiserror::Error;
+use tracing::trace;
 
-use crate::{InferenceContext, Type};
-
-/// A trait for types that can be unified.
-pub trait Unify {
-    /// The context in which the types are being unified.
-    type Context;
-
-    /// The error that occurs during unification.
-    type Error;
-
-    /// Unifies two instances.
-    fn unify(&self, other: &Self, context: &Self::Context) -> Result<Self, Self::Error>
-    where
-        Self: Sized;
-}
+use crate::{Context, Type};
 
 /// An error that occurs during unification of types.
 #[derive(Error, Debug)]
@@ -29,33 +18,42 @@ pub enum TypeUnificationError {
     MismatchedFields(String),
 }
 
-impl Unify for Type {
-    type Context = InferenceContext;
-    type Error = TypeUnificationError;
-
-    fn unify(&self, other: &Self, context: &Self::Context) -> Result<Self, <Type as Unify>::Error>
-    where
-        Self: Sized,
-    {
+impl Type {
+    /// Unified two types.
+    pub fn unify(&self, other: &Self, context: &mut Context) -> Result<Self, TypeUnificationError> {
+        trace!("unify");
         match (self, other) {
-            // If either type is an inference type, return the other type.
-            (Type::Infer(name), x) | (x, Type::Infer(name)) => context
-                .variable(name)
-                .map(|a| a.unify(&x, &context))
-                .unwrap_or(Ok(x.clone())),
-            // Arrays unify if their element types unify.
-            (Type::Array(a), Type::Array(b)) => a.unify(b, &context).map(|t| Type::Array(t.into())),
-            // Tuples unify if their element types unify.
+            // enforce ordering of inference types
+            (Type::Infer(idx), Type::Infer(idy)) => match idx.cmp(idy) {
+                Ordering::Less => {
+                    context.infer(*idx, other.clone());
+                    Ok(other.clone())
+                }
+                Ordering::Greater => {
+                    context.infer(*idy, self.clone());
+                    Ok(self.clone())
+                }
+                Ordering::Equal => Ok(self.clone()),
+            },
+            // if either type is an inference type, return the other type.
+            (Type::Infer(idx), x) | (x, Type::Infer(idx)) => {
+                context.infer(*idx, x.clone());
+                Ok(x.clone())
+            }
+            // arrays unify if their element types unify.
+            (Type::Array(a), Type::Array(b)) => a.unify(b, context).map(|t| Type::Array(t.into())),
+            // tuples unify if their element types unify.
             (Type::Tuple(a), Type::Tuple(b)) => {
                 if a.len() != b.len() {
                     return Err(TypeUnificationError::MismatchedLength(a.len(), b.len()));
                 }
                 let mut types = Vec::new();
                 for (a, b) in a.iter().zip(b) {
-                    types.push(a.unify(b, &context)?);
+                    types.push(a.unify(b, context)?);
                 }
                 Ok(Type::Tuple(types))
             }
+            // records unify if their fields unify
             (Type::Record(a), Type::Record(b)) => {
                 if a.len() != b.len() {
                     return Err(TypeUnificationError::MismatchedLength(a.len(), b.len()));
@@ -67,12 +65,12 @@ impl Unify for Type {
                     if a_name != b_name {
                         return Err(TypeUnificationError::MismatchedFields(a_name.clone()));
                     }
-                    fields.push((a_name.clone(), a_type.unify(&b_type, &context)?));
+                    fields.push((a_name.clone(), a_type.unify(&b_type, context)?));
                 }
 
                 Ok(Type::Record(fields.into_iter().collect()))
             }
-            // otherwise, the types must be equal
+            // otherwise, the types must be identical
             (x, y) => {
                 if x == y {
                     Ok(x.clone())
@@ -91,7 +89,7 @@ impl Unify for Type {
 mod tests {
     use std::collections::BTreeMap;
 
-    use crate::{unify::Unify, Constant, InferenceContext, Type};
+    use crate::{Constant, Context, Type};
 
     #[test]
     fn unify_literals() {
@@ -101,58 +99,42 @@ mod tests {
         let string = Type::Constant(Constant::String);
         let unit = Type::Constant(Constant::Unit);
 
-        assert_eq!(int.unify(&int, &InferenceContext::default()).unwrap(), int);
+        assert_eq!(int.unify(&int, &mut Context::default()).unwrap(), int);
+        assert_eq!(float.unify(&float, &mut Context::default()).unwrap(), float);
+        assert_eq!(bool.unify(&bool, &mut Context::default()).unwrap(), bool);
         assert_eq!(
-            float.unify(&float, &InferenceContext::default()).unwrap(),
-            float
-        );
-        assert_eq!(
-            bool.unify(&bool, &InferenceContext::default()).unwrap(),
-            bool
-        );
-        assert_eq!(
-            string.unify(&string, &InferenceContext::default()).unwrap(),
+            string.unify(&string, &mut Context::default()).unwrap(),
             string
         );
-        assert_eq!(
-            unit.unify(&unit, &InferenceContext::default()).unwrap(),
-            unit
-        );
+        assert_eq!(unit.unify(&unit, &mut Context::default()).unwrap(), unit);
 
-        assert!(int.unify(&float, &InferenceContext::default()).is_err());
-        assert!(int.unify(&bool, &InferenceContext::default()).is_err());
-        assert!(int.unify(&string, &InferenceContext::default()).is_err());
-        assert!(int.unify(&unit, &InferenceContext::default()).is_err());
-        assert!(float.unify(&bool, &InferenceContext::default()).is_err());
-        assert!(float.unify(&string, &InferenceContext::default()).is_err());
-        assert!(float.unify(&unit, &InferenceContext::default()).is_err());
-        assert!(bool.unify(&string, &InferenceContext::default()).is_err());
-        assert!(bool.unify(&unit, &InferenceContext::default()).is_err());
-        assert!(string.unify(&unit, &InferenceContext::default()).is_err());
+        assert!(int.unify(&float, &mut Context::default()).is_err());
+        assert!(int.unify(&bool, &mut Context::default()).is_err());
+        assert!(int.unify(&string, &mut Context::default()).is_err());
+        assert!(int.unify(&unit, &mut Context::default()).is_err());
+        assert!(float.unify(&bool, &mut Context::default()).is_err());
+        assert!(float.unify(&string, &mut Context::default()).is_err());
+        assert!(float.unify(&unit, &mut Context::default()).is_err());
+        assert!(bool.unify(&string, &mut Context::default()).is_err());
+        assert!(bool.unify(&unit, &mut Context::default()).is_err());
+        assert!(string.unify(&unit, &mut Context::default()).is_err());
     }
 
     #[test]
     fn unify_inferred_tuples() {
         let int = Type::Constant(Constant::Int);
-        let tuple_a = Type::Tuple(vec![
-            Type::Infer("x".to_string()),
-            Type::Infer("y".to_string()),
-        ]);
+        let tuple_a = Type::Tuple(vec![Type::Infer(0), Type::Infer(1)]);
         let tuple_b = Type::Tuple(vec![int.clone(), int.clone()]);
 
         assert_eq!(
-            tuple_a
-                .unify(&tuple_b, &InferenceContext::default())
-                .unwrap(),
+            tuple_a.unify(&tuple_b, &mut Context::default()).unwrap(),
             Type::Tuple(vec![int.clone(), int.clone()])
         );
 
-        let tuple_a = Type::Tuple(vec![Type::Infer("x".to_string()), int.clone()]);
-        let tuple_b = Type::Tuple(vec![int.clone(), Type::Infer("y".to_string())]);
+        let tuple_a = Type::Tuple(vec![Type::Infer(0), int.clone()]);
+        let tuple_b = Type::Tuple(vec![int.clone(), Type::Infer(1)]);
         assert_eq!(
-            tuple_a
-                .unify(&tuple_b, &InferenceContext::default())
-                .unwrap(),
+            tuple_a.unify(&tuple_b, &mut Context::default()).unwrap(),
             Type::Tuple(vec![int.clone(), int.clone()])
         );
     }
@@ -161,8 +143,8 @@ mod tests {
     fn unify_inferred_structs() {
         let int = Type::Constant(Constant::Int);
         let struct_a = Type::Record(BTreeMap::from_iter(vec![
-            ("a".to_string(), Type::Infer("x".to_string())),
-            ("b".to_string(), Type::Infer("y".to_string())),
+            ("a".to_string(), Type::Infer(0)),
+            ("b".to_string(), Type::Infer(1)),
         ]));
         let struct_b = Type::Record(BTreeMap::from_iter(vec![
             ("a".to_string(), int.clone()),
@@ -170,9 +152,7 @@ mod tests {
         ]));
 
         assert_eq!(
-            struct_a
-                .unify(&struct_b, &InferenceContext::default())
-                .unwrap(),
+            struct_a.unify(&struct_b, &mut Context::default()).unwrap(),
             Type::Record(BTreeMap::from_iter(vec![
                 ("a".to_string(), int.clone()),
                 ("b".to_string(), int.clone()),
@@ -180,17 +160,15 @@ mod tests {
         );
 
         let struct_a = Type::Record(BTreeMap::from_iter(vec![
-            ("a".to_string(), Type::Infer("x".to_string())),
+            ("a".to_string(), Type::Infer(0)),
             ("b".to_string(), int.clone()),
         ]));
         let struct_b = Type::Record(BTreeMap::from_iter(vec![
             ("a".to_string(), int.clone()),
-            ("b".to_string(), Type::Infer("y".to_string())),
+            ("b".to_string(), Type::Infer(1)),
         ]));
         assert_eq!(
-            struct_a
-                .unify(&struct_b, &InferenceContext::default())
-                .unwrap(),
+            struct_a.unify(&struct_b, &mut Context::default()).unwrap(),
             Type::Record(BTreeMap::from_iter(vec![
                 ("a".to_string(), int.clone()),
                 ("b".to_string(), int.clone()),

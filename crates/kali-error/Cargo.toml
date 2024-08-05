@@ -1,0 +1,10 @@
+[package]
+name = "kali-error"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ariadne = "0.4"
+thiserror = "1.0"
+
+kali-type = { path = "../kali-type" }

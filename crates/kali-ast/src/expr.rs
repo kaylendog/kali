@@ -1,8 +1,8 @@
 //! Expressions.
 
-use kali_type::{InferenceContext, Type, TypeInferenceError, Typed};
+use kali_type::{Context, Type, TypeInferenceError, Typed};
 
-use crate::{conditional::Conditional, literal::Literal, unary::UnaryExpr, BinaryExpr};
+use crate::{conditional::Conditional, literal::Literal, unary::UnaryExpr, BinaryExpr, Lambda};
 
 /// An expression in the Kali language.
 #[derive(Debug, Clone)]
@@ -17,6 +17,8 @@ pub enum Expr {
     UnaryExpr(UnaryExpr),
     /// A conditional expression.
     Conditional(Conditional),
+    /// A lambda expression.
+    Lambda(Lambda),
 }
 
 impl PartialEq for Expr {
@@ -30,16 +32,17 @@ impl PartialEq for Expr {
 }
 
 impl Typed for Expr {
-    fn ty(&self, context: &InferenceContext) -> Result<Type, TypeInferenceError> {
+    fn ty(&self, mut context: &mut Context) -> Result<Type, TypeInferenceError> {
         match self {
-            Expr::Literal(literal) => literal.ty(&context),
+            Expr::Literal(literal) => literal.ty(&mut context),
             Expr::Identifier(name) => Ok(context
-                .variable(name)
+                .get_known(name)
                 .cloned()
-                .unwrap_or(Type::Infer(name.clone()))),
+                .unwrap_or_else(|| context.declare_inferred())),
             Expr::BinaryExpr(binary_expr) => binary_expr.ty(context),
             Expr::UnaryExpr(unary_expr) => unary_expr.ty(context),
             Expr::Conditional(conditional) => conditional.ty(context),
+            Expr::Lambda(lambda) => lambda.ty(context),
         }
     }
 }

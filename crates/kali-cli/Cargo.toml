@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 kali-parse = { path = "../kali-parse" }
+kali-type = { path = "../kali-type" }
 kali-ir = { path = "../kali-ir" }
 kali-vm = { path = "../kali-vm" }
 
