@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 
-use kali_type::{Context, Type, TypeInferenceError, Typed};
+use kali_type::{Context, Type, TypeInferenceError, Typed, TypedIterator};
 
 use crate::Expr;
 
@@ -16,6 +16,7 @@ pub enum Pattern {
     Tuple(Vec<Pattern>),
     /// A struct pattern.
     Record(Vec<(String, Pattern)>),
+    /// A list pattern.
     List(Vec<Pattern>),
     /// A tuple pattern.
     Cons(Box<Pattern>, Box<Pattern>),
@@ -31,6 +32,6 @@ pub struct Match {
 
 impl Typed for Match {
     fn ty(&self, context: &mut Context) -> Result<Type, TypeInferenceError> {
-        todo!()
+        self.branches.values().fold_unify(context)
     }
 }

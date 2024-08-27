@@ -3,41 +3,41 @@
 use std::collections::BTreeMap;
 
 use kali_ast::{BinaryOp, Literal, UnaryOp};
-use kali_ir::Operator;
+use kali_ir::{Module, Operator};
 
 /// A runtime for executing Kali code.
 pub struct Runtime {
     /// The stack of literals.
     stack: Vec<Literal>,
-    /// A map of variable names to their addresses on the stack.
+    /// A map of variable names to their addresses on the heap.
     variables: BTreeMap<String, usize>,
     /// Program counter.
     pc: usize,
-    /// The program of instructions.
-    program: Vec<Operator>,
+    /// The module to execute.
+    module: Module,
 }
 
 impl Runtime {
     /// Create a new runtime.
-    pub fn new(program: Vec<Operator>) -> Self {
+    pub fn new(module: Module) -> Self {
         Self {
             stack: Vec::new(),
             variables: BTreeMap::new(),
             pc: 0,
-            program,
+            module,
         }
     }
 
-    /// Run the program.
+    /// Run the module.
     pub fn run(&mut self) {
-        while self.pc < self.program.len() {
+        while self.pc < self.module.len() {
             self.step();
         }
     }
 
     /// Run the program in debug mode.
     pub fn run_debug(&mut self) {
-        while self.pc < self.program.len() {
+        while self.pc < self.module.len() {
             print!("{:04} {:?}", self.pc, self.stack);
             self.step();
             println!(" -> {:?}", self.stack);
@@ -46,7 +46,7 @@ impl Runtime {
 
     /// Execute the next instruction.
     pub fn step(&mut self) {
-        let operator = { &self.program[self.pc].clone() };
+        let operator = { &self.module[self.pc].clone() };
         operator.execute(self);
         self.pc += 1;
     }

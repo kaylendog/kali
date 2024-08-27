@@ -2,7 +2,17 @@
 
 use kali_type::{Context, Type, TypeInferenceError, Typed};
 
-use crate::{conditional::Conditional, literal::Literal, unary::UnaryExpr, BinaryExpr, Lambda};
+mod binary;
+mod conditional;
+mod lambda;
+mod literal;
+mod unary;
+
+pub use binary::*;
+pub use conditional::*;
+pub use lambda::*;
+pub use literal::*;
+pub use unary::*;
 
 /// An expression in the Kali language.
 #[derive(Debug, Clone)]

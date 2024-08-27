@@ -2,7 +2,6 @@ use std::path::PathBuf;
 
 use clap::Parser;
 use kali_ir::Compile;
-use kali_type::Typed;
 use kali_vm::Runtime;
 use rustyline::DefaultEditor;
 use tracing::level_filters::LevelFilter;
@@ -48,12 +47,14 @@ fn main() {
         SubCommand::Run(run) => {
             let ast = kali_parse::parse_file(&run.path).unwrap();
             // compile to stack machine
-            let mut unit = kali_ir::StackTranslationUnit::new();
-            ast.compile(&mut unit);
+            let mut unit = kali_ir::ModuleBuilder::new();
+            let main = unit.function("main");
+            ast.compile(&mut main);
+            main.finish();
             // print stack machine
-            if args.verbose {
-                println!("{:?}", unit);
-            }
+            // if args.verbose {
+            //     println!("{:?}", unit);
+            // }
             // execute
             let mut runtime = Runtime::new(unit.into_inner());
             runtime.run();
@@ -103,8 +104,10 @@ fn main() {
                         println!("\nType: {:?}\n", ty);
 
                         // compile to stack machine
-                        let mut unit = kali_ir::StackTranslationUnit::new();
-                        ast.compile(&mut unit);
+                        let mut unit = kali_ir::ModuleBuilder::new();
+                        let main = unit.function("main");
+                        ast.compile(&mut main);
+                        main.finish();
 
                         // print stack machine
                         if verbose {

@@ -1,32 +1,25 @@
 use std::str::FromStr;
 
-use kali_ast::{Expr, BinaryExpr, BinaryOp, Literal, UnaryExpr, UnaryOp, Conditional, Lambda, Node};
+use kali_ast::{
+    BinaryExpr,
+    BinaryOp,
+    Conditional,
+    Decl,
+    Export,
+    Expr,
+    Import,
+    Lambda,
+    Literal,
+    Node,
+    Stmt,
+    UnaryExpr,
+    UnaryOp
+};
 
 grammar;
 
 Node<T>: Node<T> = {
     <start:@L> <t:T> <end:@R> => Node::new(t, start..end),
-};
-
-Identifier: String = {
-    r"[a-zA-Z_][a-zA-Z0-9_]*" => <>.to_string(),
-};
-
-Int: i64 = {
-    r"-?[0-9]+" => i64::from_str(<>).unwrap(),
-};
-
-Float: f64 = {
-    r"-?[0-9]+\.[0-9]+" => f64::from_str(<>).unwrap(),
-};
-
-Bool: bool = {
-    "true" => true,
-    "false" => false,
-};
-
-String: String = {
-    r#""[^"]*""# => <>.to_string(),
 };
 
 Comma0<T>: Vec<T> = { // (1)
@@ -52,6 +45,27 @@ Comma2<T>: Vec<T> = {
         v
     }
 }
+
+Identifier: String = {
+    r"[a-zA-Z_][a-zA-Z0-9_]*" => <>.to_string(),
+};
+
+Int: i64 = {
+    r"-?[0-9]+" => i64::from_str(<>).unwrap(),
+};
+
+Float: f64 = {
+    r"-?[0-9]+\.[0-9]+" => f64::from_str(<>).unwrap(),
+};
+
+Bool: bool = {
+    "true" => true,
+    "false" => false,
+};
+
+String: String = {
+    r#""[^"]*""# => <>.to_string(),
+};
 
 Array: Vec<Node<Expr>> = {
     "[" <Comma0<Node<Expr>>> "]" => <>,
@@ -134,3 +148,19 @@ pub Expr: Expr = {
     Lambda => Expr::Lambda(<>),
 };
  
+pub Import: Import = {
+    "import" "{" <symbols:Comma0<Identifier>> "}" "from" <path:String> => Import::new(path, symbols),
+};
+
+pub Export: Export = {
+    "export" "{" <symbols:Comma0<Identifier>> "}" => Export::new(symbols),
+};
+
+pub Decl: Decl = {
+    "let" <name:Identifier> "=" <value:Node<Expr>> => Decl::new(name, value),
+}
+
+pub Stmt: Stmt = {
+    Import => Stmt::Import(<>),
+    Export => Stmt::Export(<>),
+}

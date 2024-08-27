@@ -75,8 +75,7 @@ impl Typed for BinaryExpr {
                     _ => Ok(inner),
                 })
                 .map_err(|error| TypeInferenceError::UnificationFailed(lhs, rhs, error)),
-            (Err(lhs), Ok(_)) => Err(lhs),
-            (Ok(_), Err(rhs)) => Err(rhs),
+            (Err(err), Ok(_)) | (Ok(_), Err(err)) => Err(err),
             (Err(lhs), Err(rhs)) => Err(lhs.combine(rhs)),
         }
     }
