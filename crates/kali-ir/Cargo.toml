@@ -8,3 +8,4 @@ bitcode = "0.6"
 strum = "0.26"
 
 kali-ast = { path = "../kali-ast" }
+kali-type = { path = "../kali-type" }

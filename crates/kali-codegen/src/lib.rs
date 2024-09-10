@@ -125,7 +125,7 @@ trait Translate {
 impl Translate for Operator {
     fn translate(&self, module: &JITModule, builder: &mut FunctionBuilder) {
         match self {
-            Operator::PushLiteral(literal) => {
+            Operator::PushInt(literal) => {
                 let value = match literal {
                     Literal::Int(value) => builder.ins().iconst(types::I64, *value),
                     Literal::Float(value) => builder.ins().f64const(*value),

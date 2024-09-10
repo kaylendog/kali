@@ -1,5 +1,6 @@
 //! Unary expressions.
 
+use bitcode::{Decode, Encode};
 use kali_type::{Context, Type, TypeInferenceError, Typed};
 
 use crate::{Expr, Node};
@@ -23,7 +24,7 @@ impl UnaryExpr {
 }
 
 /// An enumeration of unary operators.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Encode, Decode)]
 pub enum UnaryOp {
     /// The negation operator.
     Negate,

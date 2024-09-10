@@ -3,11 +3,13 @@
 use std::collections::HashMap;
 
 use kali_ast::{BinaryExpr, BinaryOp, Conditional, Expr, Literal, Node, Stmt, UnaryExpr, UnaryOp};
+use kali_type::{Constant, Type};
 
 use crate::Operator;
 
 /// A translation unit in the stack-based intermediate representation.
 pub struct ModuleBuilder {
+    /// The functions in the translation unit.
     pub functions: HashMap<String, Vec<Operator>>,
 }
 
@@ -40,20 +42,115 @@ pub struct FunctionBuilder<'a> {
 }
 
 impl FunctionBuilder<'_> {
-    /// Push a literal onto the stack.
-    pub fn push_literal(&mut self, literal: Literal) {
-        self.instructions.push(Operator::PushLiteral(literal));
+    /// Push an integer literal onto the stack.
+    pub fn pushi(&mut self, value: i64) {
+        self.instructions.push(Operator::PushInt(value));
     }
 
-    /// Push a variable onto the stack.
-    pub fn push_variable(&mut self, name: &str) {
+    /// Push a floating-point literal onto the stack.
+    pub fn pushf(&mut self, value: f64) {
+        self.instructions.push(Operator::PushFloat(value));
+    }
+
+    /// Push a boolean literal onto the stack.
+    pub fn pushb(&mut self, value: bool) {
+        self.instructions.push(Operator::PushBool(value));
+    }
+
+    /// Load an integer from a variable onto the stack.
+    pub fn loadi(&mut self, name: &str) {
         self.instructions
-            .push(Operator::PushVariable(name.to_string()));
+            .push(Operator::LoadInteger(name.to_string()));
     }
 
-    /// Perform a binary operation.
-    pub fn binary_op(&mut self, operator: BinaryOp) {
-        self.instructions.push(Operator::BinaryOp(operator));
+    /// Load a floating-point number from a variable onto the stack.
+    pub fn loadf(&mut self, name: &str) {
+        self.instructions
+            .push(Operator::LoadFloat(name.to_string()));
+    }
+
+    /// Load a boolean from a variable onto the stack.
+    pub fn loadb(&mut self, name: &str) {
+        self.instructions.push(Operator::LoadBool(name.to_string()));
+    }
+    /// Add two integers.
+    pub fn addi(&mut self) {
+        self.instructions.push(Operator::AddInt);
+    }
+
+    /// Subtract two integers.
+    pub fn subi(&mut self) {
+        self.instructions.push(Operator::SubtractInt);
+    }
+
+    /// Multiply two integers.
+    pub fn muli(&mut self) {
+        self.instructions.push(Operator::MultiplyInt);
+    }
+
+    /// Divide two integers.
+    pub fn divi(&mut self) {
+        self.instructions.push(Operator::DivideInt);
+    }
+
+    /// Left-shift an integer.
+    pub fn lshift(&mut self) {
+        self.instructions.push(Operator::LeftShift);
+    }
+
+    /// Right-shift an integer.
+    pub fn rshift(&mut self) {
+        self.instructions.push(Operator::RightShift);
+    }
+
+    /// Perform a bitwise and operation on two integers.
+    pub fn andi(&mut self) {
+        self.instructions.push(Operator::AndInt);
+    }
+
+    /// Perform a bitwise or operation on two integers.
+    pub fn ori(&mut self) {
+        self.instructions.push(Operator::OrInt);
+    }
+
+    /// Perform a bitwise xor operation on two integers.
+    pub fn xori(&mut self) {
+        self.instructions.push(Operator::XorInt);
+    }
+
+    /// Add two floating-point numbers.
+    pub fn addf(&mut self) {
+        self.instructions.push(Operator::AddFloat);
+    }
+
+    /// Subtract two floating-point numbers.
+    pub fn subf(&mut self) {
+        self.instructions.push(Operator::SubtractFloat);
+    }
+
+    /// Multiply two floating-point numbers.
+    pub fn mulf(&mut self) {
+        self.instructions.push(Operator::MultiplyFloat);
+    }
+
+    /// Divide two floating-point numbers.
+    pub fn divf(&mut self) {
+        self.instructions.push(Operator::DivideFloat);
+    }
+
+    /// Negate an integer.
+    pub fn negi(&mut self) {
+        self.instructions.push(Operator::NegateInt);
+    }
+
+    /// Bitwise not an integer.
+    pub fn noti(&mut self) {
+        self.instructions.push(Operator::NotInt);
+    }
+
+    /// Negate a floating-point number.
+    pub fn negf(&mut self) {
+        self.instructions.push(Operator::NegateFloat);
     }
 
     /// Perform a unary operation.
@@ -94,8 +191,13 @@ where
 impl Compile for Expr {
     fn compile(&self, unit: &mut FunctionBuilder) {
         match self {
-            Expr::Literal(literal) => unit.push_literal(literal.clone()),
-            Expr::Identifier(name) => unit.push_variable(name),
+            Expr::Literal(literal) => match literal {
+                Literal::Int(value) => unit.pushi(*value),
+                Literal::Float(value) => unit.pushf(*value),
+                Literal::Bool(value) => unit.pushb(*value),
+                _ => todo!("literal compilation"),
+            },
+            Expr::Identifier(_) => todo!("identifier compilation"),
             Expr::BinaryExpr(binary) => binary.compile(unit),
             Expr::UnaryExpr(unary) => unary.compile(unit),
             Expr::Conditional(conditional) => conditional.compile(unit),
@@ -108,7 +210,33 @@ impl Compile for BinaryExpr {
     fn compile(&self, unit: &mut FunctionBuilder) {
         self.lhs.compile(unit);
         self.rhs.compile(unit);
-        unit.binary_op(self.operator);
+        // get type of lhs - should be the same as rhs under the type checker
+        let ty = self.lhs.meta.ty.get().unwrap();
+        match ty {
+            Type::Constant(c) => match c {
+                Constant::Int => match self.operator {
+                    BinaryOp::Add => unit.addi(),
+                    BinaryOp::Subtract => unit.subi(),
+                    BinaryOp::Multiply => unit.muli(),
+                    BinaryOp::Divide => unit.divi(),
+                    BinaryOp::BitwiseShiftLeft => unit.lshift(),
+                    BinaryOp::BitwiseShiftRight => unit.rshift(),
+                    BinaryOp::BitwiseAnd => unit.andi(),
+                    BinaryOp::BitwiseOr => unit.ori(),
+                    BinaryOp::BitwiseXor => unit.xori(),
+                    x => panic!("unsupported operator {x:?}"),
+                },
+                Constant::Float => match self.operator {
+                    BinaryOp::Add => unit.addf(),
+                    BinaryOp::Subtract => unit.subf(),
+                    BinaryOp::Multiply => unit.mulf(),
+                    BinaryOp::Divide => unit.divf(),
+                    x => panic!("unsupported operator {x:?}"),
+                },
+                x => panic!("unsupported type {x}"),
+            },
+            x => panic!("unsupported type {x}"),
+        }
     }
 }
 
@@ -150,10 +278,10 @@ impl Compile for Conditional {
 impl Compile for Stmt {
     fn compile(&self, unit: &mut FunctionBuilder) {
         match self {
-            Stmt::Import(_) => todo!(),
-            Stmt::Export(_) => todo!(),
+            Stmt::Import(_) => todo!("import compilation"),
+            Stmt::Export(_) => todo!("export compilation"),
             Stmt::Const(_, _) => todo!(),
-            Stmt::Type(_, _) => todo!(),
+            Stmt::Type(_, _) => {}
             Stmt::Decl(_) => todo!(),
         }
     }

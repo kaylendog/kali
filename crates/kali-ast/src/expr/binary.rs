@@ -1,11 +1,12 @@
 //! Binary expressions and associated types.
 
+use bitcode::{Decode, Encode};
 use kali_type::{Constant, Context, Type, TypeInferenceError, Typed};
 
 use crate::{Expr, Node};
 
 /// An enumeration of binary operators.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Encode, Decode)]
 pub enum BinaryOp {
     Add,
     Subtract,

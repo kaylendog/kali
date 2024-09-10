@@ -8,3 +8,9 @@ pub enum Error {
     #[error("type error: {0}")]
     TypeError(#[from] kali_type::TypeInferenceError),
 }
+
+impl Error {
+    pub fn into_report(self) -> Report<'static> {
+        todo!()
+    }
+}
