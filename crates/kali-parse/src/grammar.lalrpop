@@ -46,6 +46,16 @@ Comma2<T>: Vec<T> = {
     }
 }
 
+DoubleSemi0<T>: Vec<T> = {
+    <mut v:(<T> ";;")*> <e:T?> => match e {
+        None => v,
+        Some(e) => {
+            v.push(e);
+            v
+        }
+    }
+}
+
 Identifier: String = {
     r"[a-zA-Z_][a-zA-Z0-9_]*" => <>.to_string(),
 };
@@ -163,4 +173,9 @@ pub Decl: Decl = {
 pub Stmt: Stmt = {
     Import => Stmt::Import(<>),
     Export => Stmt::Export(<>),
+    Decl => Stmt::Decl(<>),
+}
+
+pub Stmts: Vec<Node<Stmt>> = {
+    <DoubleSemi0<Node<Stmt>>>
 }

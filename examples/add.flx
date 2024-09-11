@@ -1,0 +1,1 @@
+let add = fn x -> x + 1

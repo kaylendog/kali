@@ -1,7 +1,7 @@
 use cranelift::prelude::*;
 use cranelift_jit::{JITBuilder, JITModule};
 use cranelift_module::{DataDescription, Module};
-use kali_ast::{BinaryOp, Literal, UnaryOp};
+use kali_ast::UnaryOp;
 use kali_ir::Operator;
 
 /// A stack translation unit.
@@ -125,68 +125,6 @@ trait Translate {
 impl Translate for Operator {
     fn translate(&self, module: &JITModule, builder: &mut FunctionBuilder) {
         match self {
-            Operator::PushInt(literal) => {
-                let value = match literal {
-                    Literal::Int(value) => builder.ins().iconst(types::I64, *value),
-                    Literal::Float(value) => builder.ins().f64const(*value),
-                    Literal::Bool(value) => builder.ins().iconst(types::I8, *value as i64),
-                    Literal::String(value) => todo!(),
-                    Literal::Unit => todo!(),
-                    Literal::Array(value) => todo!(),
-                    Literal::Tuple(value) => todo!(),
-                    Literal::Struct(value) => todo!(),
-                };
-                // push value to the stack
-                self.push_value(&module, builder, value, 8);
-            }
-            Operator::PushVariable(_) => todo!(),
-            Operator::BinaryOp(op) => {
-                // pop two values from the stack
-                let (a, b) = self.pop_value_2(&module, builder, 8);
-
-                // perform operation
-                let result = match op {
-                    BinaryOp::Add => builder.ins().iadd(a, b),
-                    BinaryOp::Subtract => builder.ins().isub(a, b),
-                    BinaryOp::Multiply => builder.ins().imul(a, b),
-                    BinaryOp::Divide => builder.ins().sdiv(a, b),
-                    BinaryOp::Exponentiate => todo!("exponentiate"),
-                    BinaryOp::Modulo => {
-                        let div = builder.ins().sdiv(a, b);
-                        let mul = builder.ins().imul(div, b);
-                        builder.ins().isub(a, mul)
-                    }
-                    BinaryOp::Equal => builder.ins().icmp(IntCC::Equal, a, b),
-                    BinaryOp::NotEqual => builder.ins().icmp(IntCC::NotEqual, a, b),
-                    BinaryOp::LessThan => builder.ins().icmp(IntCC::SignedLessThan, a, b),
-                    BinaryOp::LessThanOrEqual => {
-                        builder.ins().icmp(IntCC::SignedLessThanOrEqual, a, b)
-                    }
-                    BinaryOp::GreaterThan => builder.ins().icmp(IntCC::SignedGreaterThan, a, b),
-                    BinaryOp::GreaterThanOrEqual => {
-                        builder.ins().icmp(IntCC::SignedGreaterThanOrEqual, a, b)
-                    }
-                    BinaryOp::LogicalAnd => {
-                        let value1 = builder.ins().icmp_imm(IntCC::NotEqual, a, 0);
-                        let value2 = builder.ins().icmp_imm(IntCC::NotEqual, b, 0);
-                        builder.ins().band(value1, value2)
-                    }
-                    BinaryOp::LogicalOr => {
-                        let value1 = builder.ins().icmp_imm(IntCC::NotEqual, a, 0);
-                        let value2 = builder.ins().icmp_imm(IntCC::NotEqual, b, 0);
-                        builder.ins().bor(value1, value2)
-                    }
-                    BinaryOp::BitwiseAnd => builder.ins().band(a, b),
-                    BinaryOp::BitwiseOr => builder.ins().bor(a, b),
-                    BinaryOp::BitwiseXor => builder.ins().bxor(a, b),
-                    BinaryOp::BitwiseShiftLeft => builder.ins().ishl(a, b),
-                    BinaryOp::BitwiseShiftRight => builder.ins().sshr(a, b),
-                    BinaryOp::Concatenate => todo!(),
-                };
-
-                // push result to the stack
-                self.push_value(&module, builder, result, 8);
-            }
             Operator::UnaryOp(op) => {
                 // pop value from the stack
                 let value = self.pop_value(&module, builder, 4);
@@ -226,10 +164,7 @@ impl Translate for Operator {
                 // where it ends?
                 builder.switch_to_block(body);
             }
-            Operator::Pop => {
-                // pop value from the stack
-                self.pop_value(&module, builder, 8);
-            }
+            _ => todo!(),
         }
     }
 }

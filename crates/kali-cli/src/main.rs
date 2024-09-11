@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 
 use clap::Parser;
-use kali_ir::Compile;
-use kali_vm::Runtime;
+use kali_ast::Stmt;
+use kali_type::Typed;
 use rustyline::DefaultEditor;
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber::EnvFilter;
@@ -45,26 +45,35 @@ fn main() {
 
     match args.subcommand {
         SubCommand::Run(run) => {
-            let ast = kali_parse::parse_file(&run.path).unwrap();
-            // compile to stack machine
-            let mut unit = kali_ir::ModuleBuilder::new();
-            let main = unit.function("main");
-            ast.compile(&mut main);
-            main.finish();
-            // print stack machine
-            // if args.verbose {
-            //     println!("{:?}", unit);
-            // }
-            // execute
-            let mut runtime = Runtime::new(unit.into_inner());
-            runtime.run();
+            let stmts = kali_parse::parse_file(&run.path).unwrap();
+            // type check the program
+            let mut ctx = kali_type::Context::default();
 
-            println!("{:?}", runtime.stack());
+            // declare top-level types
+            for stmt in stmts
+                .iter()
+                .filter(|stmt| matches!(stmt.inner, Stmt::Type(..)))
+            {
+                let ty = stmt.ty(&mut ctx);
+                if let Err(e) = ty {
+                    eprintln!("Type Error: {}", e);
+                }
+            }
+
+            // type check declarations
+            for stmt in stmts
+                .iter()
+                .filter(|stmt| !matches!(stmt.inner, Stmt::Type(..)))
+            {
+                let ty = stmt.ty(&mut ctx);
+                if let Err(e) = ty {
+                    eprintln!("Type Error: {}", e);
+                }
+            }
         }
 
         SubCommand::Repl => {
             let mut rl = DefaultEditor::new().expect("failed to initialise repl");
-            let mut verbose = args.verbose;
             loop {
                 let line = rl.readline("kali>> ");
                 match line {
@@ -76,7 +85,6 @@ fn main() {
                         match line.as_str() {
                             "quit" | "exit" | "q" => break,
                             "debug" => {
-                                verbose = true;
                                 continue;
                             }
                             _ => {}
@@ -86,43 +94,20 @@ fn main() {
                             .expect("failed to add history entry");
                         let ast = kali_parse::parse_str(&line).unwrap();
 
-                        // assert stack is well typed
-                        let mut ctx = kali_type::Context::default();
-                        let ty = match ast.ty(&mut ctx).and_then(|ty| ty.resolve(&mut ctx)) {
-                            Ok(ty) => ty,
-                            Err(e) => {
-                                eprintln!("Type Error: {}", e);
-                                continue;
-                            }
-                        };
+                        // // assert program is well typed
+                        // let mut ctx = kali_type::Context::default();
+                        // let ty = match ast.ty(&mut ctx).and_then(|ty| ty.resolve(&mut ctx)) {
+                        //     Ok(ty) => ty,
+                        //     Err(e) => {
+                        //         eprintln!("Type Error: {}", e);
+                        //         continue;
+                        //     }
+                        // };
 
-                        if !ty.is_monotype() {
-                            eprintln!("Type Error: expected definite type, found {:?}", ty);
-                            continue;
-                        }
-
-                        println!("\nType: {:?}\n", ty);
-
-                        // compile to stack machine
-                        let mut unit = kali_ir::ModuleBuilder::new();
-                        let main = unit.function("main");
-                        ast.compile(&mut main);
-                        main.finish();
-
-                        // print stack machine
-                        if verbose {
-                            println!("{:?}", unit);
-                        }
-
-                        // execute
-                        let mut runtime = Runtime::new(unit.into_inner());
-                        if verbose {
-                            runtime.run_debug()
-                        } else {
-                            runtime.run()
-                        }
-
-                        println!("{:?}", runtime.stack());
+                        // if !ty.is_monotype() {
+                        //     eprintln!("Type Error: expected definite type, found {:?}", ty);
+                        //     continue;
+                        // }
                     }
                     Err(_) => break,
                 }

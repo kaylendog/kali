@@ -24,7 +24,6 @@ pub enum ConstantType {
     Bool,
     String,
     Unit,
-    Never,
 }
 
 impl TypeExpr {
@@ -36,7 +35,6 @@ impl TypeExpr {
                 ConstantType::Bool => Type::Constant(Constant::Bool),
                 ConstantType::String => Type::Constant(Constant::String),
                 ConstantType::Unit => Type::Constant(Constant::Unit),
-                ConstantType::Never => Type::Constant(Constant::Never),
             },
             TypeExpr::Variable(_name) => todo!("TypeExpr::Variable"),
             TypeExpr::Function(params, ret) => {

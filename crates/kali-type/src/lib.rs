@@ -28,6 +28,8 @@ pub enum Type {
     Lambda(Vec<Type>, Box<Type>),
     /// Represents a type that has not yet been inferred, with a unique ID.
     Infer(usize),
+    /// The never type.
+    Never,
     /// Represents an error in the type system.
     Error,
 }
@@ -78,6 +80,7 @@ impl Display for Type {
             }
             Type::Infer(id) => write!(f, "'{}", id),
             Type::Error => write!(f, "error"),
+            Type::Never => write!(f, "never"),
         }
     }
 }
@@ -103,9 +106,6 @@ pub enum Constant {
     /// A unit type.
     #[strum(serialize = "()")]
     Unit,
-    /// A never type.
-    #[strum(serialize = "!")]
-    Never,
 }
 
 #[cfg(test)]
