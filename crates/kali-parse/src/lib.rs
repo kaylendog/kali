@@ -1,18 +1,11 @@
-use std::{error::Error, path::Path};
-
 use kali_ast::{Node, Stmt};
-use lalrpop_util::lalrpop_mod;
+use lalrpop_util::{lalrpop_mod, lexer::Token};
 
-lalrpop_mod!(grammar);
+lalrpop_mod!(pub grammar);
 
-/// Parse a file into an AST.
-pub fn parse_file<P: AsRef<Path>>(path: P) -> Result<Vec<Node<Stmt>>, Box<dyn Error>> {
-    let input = std::fs::read_to_string(path)?;
-    parse_str(&input)
-}
+pub type ParseError<'src> = lalrpop_util::ParseError<usize, Token<'src>, &'static str>;
 
 /// Parse a string into an AST.
-pub fn parse_str(input: &str) -> Result<Vec<Node<Stmt>>, Box<dyn Error>> {
-    let stmts = grammar::StmtsParser::new().parse(input).unwrap();
-    Ok(stmts)
+pub fn parse_str<'src>(input: &'src str) -> Result<Vec<Node<Stmt>>, ParseError<'src>> {
+    grammar::StmtsParser::new().parse(input)
 }

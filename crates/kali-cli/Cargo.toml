@@ -4,13 +4,15 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+ariadne = "0.4"
+clap = { version = "4", features = ["derive"] }
+rustyline = "14"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
 kali-ast = { path = "../kali-ast" }
 kali-parse = { path = "../kali-parse" }
 kali-type = { path = "../kali-type" }
 kali-ir = { path = "../kali-ir" }
 kali-vm = { path = "../kali-vm" }
-
-clap = { version = "4", features = ["derive"] }
-rustyline = "14"
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+kali-error = { path = "../kali-error" }

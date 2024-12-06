@@ -202,6 +202,7 @@ impl Compile for Expr {
             Expr::UnaryExpr(unary) => unary.compile(unit),
             Expr::Conditional(conditional) => conditional.compile(unit),
             Expr::Lambda(_) => todo!("lambda compilation"),
+            Expr::Match(_) => todo!("match compilation"),
         }
     }
 }
@@ -283,6 +284,7 @@ impl Compile for Stmt {
             Stmt::Const(_, _) => todo!(),
             Stmt::Type(_, _) => {}
             Stmt::Decl(_) => todo!(),
+            Stmt::FuncDecl(_) => todo!(),
         }
     }
 }

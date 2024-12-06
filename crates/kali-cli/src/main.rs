@@ -1,11 +1,13 @@
 use std::path::PathBuf;
 
+use ariadne::Source;
 use clap::Parser;
 use kali_ast::Stmt;
-use kali_type::Typed;
 use rustyline::DefaultEditor;
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber::EnvFilter;
+
+mod compiler;
 
 /// Command line interface for the Kali programming language.
 #[derive(Parser)]
@@ -32,6 +34,9 @@ enum SubCommand {
 struct Run {
     /// Path to the Kali program.
     path: PathBuf,
+    /// Print the ast.
+    #[clap(long, default_value = "false")]
+    print_ast: bool,
 }
 
 fn main() {
@@ -45,31 +50,14 @@ fn main() {
 
     match args.subcommand {
         SubCommand::Run(run) => {
-            let stmts = kali_parse::parse_file(&run.path).unwrap();
-            // type check the program
-            let mut ctx = kali_type::Context::default();
-
-            // declare top-level types
-            for stmt in stmts
-                .iter()
-                .filter(|stmt| matches!(stmt.inner, Stmt::Type(..)))
-            {
-                let ty = stmt.ty(&mut ctx);
-                if let Err(e) = ty {
-                    eprintln!("Type Error: {}", e);
+            let src = std::fs::read_to_string(&run.path).unwrap();
+            let module = match compiler::build_module(&run.path, &src, run.print_ast) {
+                Ok(module) => module,
+                Err(err) => {
+                    err.into_report().eprint(Source::from(src)).unwrap();
+                    return;
                 }
-            }
-
-            // type check declarations
-            for stmt in stmts
-                .iter()
-                .filter(|stmt| !matches!(stmt.inner, Stmt::Type(..)))
-            {
-                let ty = stmt.ty(&mut ctx);
-                if let Err(e) = ty {
-                    eprintln!("Type Error: {}", e);
-                }
-            }
+            };
         }
 
         SubCommand::Repl => {

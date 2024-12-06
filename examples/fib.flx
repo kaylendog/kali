@@ -1,0 +1,2 @@
+fn fib n = match x with
+    | 0 -> 1 | 1 -> 2 | n -> (match y with | 0 -> 1 | n -> 1);;

@@ -103,7 +103,6 @@ impl Context {
 pub struct Scope {
     /// A map of named types in the context.
     pub known: HashMap<String, Type>,
-
     /// A reference to the global inference counter.
     pub counter: Rc<RefCell<usize>>,
 }

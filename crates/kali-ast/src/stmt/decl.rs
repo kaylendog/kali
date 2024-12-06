@@ -5,6 +5,7 @@ use kali_type::Typed;
 use crate::{Expr, Node};
 
 /// A declaration in the AST.
+#[derive(Debug, Clone)]
 pub struct Decl {
     /// The name of the declaration.
     pub name: String,

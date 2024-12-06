@@ -57,7 +57,6 @@ Kali takes inspiration from a variety of existing programming languages, includi
 
 == Design Goals
 
-
 = Syntax
 
 == Data Types
@@ -268,11 +267,29 @@ Kali's type system is heavily inspired by that of TypeScript and OCaml, and is d
 
 Kali comes with a standard library that provides a wide range of functionality, including data structures, algorithms, and utilities.
 
+= Kali Virtual Machine
+
+Kali is designed to run on a virtual machine, namely the Kali Virtual Machine (KVM). This stack-based bytecode interpreter is capable of executing compiled Kali programs using a somewhat simple instruction set.
+
+#table(
+  columns: 3,
+  "Name", "Opcode", "Description",
+  "NOP", "0x00", "No operation"
+)
+
 = Interoperability
 
 = Tooling
 
 == Compiler
+
+The compiler is a collection of tools used to compile Kali source code into its bytecode representation. 
+
+== Parser
+
+The parser is a fully-fledged LALR(1) parser generated using the `lalrpop` parser generator. It constructs the AST from the source code directly with no intermediate representation.
+
+== Passes
 
 == Formatter
 

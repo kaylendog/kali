@@ -6,12 +6,14 @@ mod binary;
 mod conditional;
 mod lambda;
 mod literal;
+mod r#match;
 mod unary;
 
 pub use binary::*;
 pub use conditional::*;
 pub use lambda::*;
 pub use literal::*;
+pub use r#match::*;
 pub use unary::*;
 
 /// An expression in the Kali language.
@@ -29,6 +31,8 @@ pub enum Expr {
     Conditional(Conditional),
     /// A lambda expression.
     Lambda(Lambda),
+    /// A match expression.
+    Match(Match),
 }
 
 impl PartialEq for Expr {
@@ -53,6 +57,7 @@ impl Typed for Expr {
             Expr::UnaryExpr(unary_expr) => unary_expr.ty(context),
             Expr::Conditional(conditional) => conditional.ty(context),
             Expr::Lambda(lambda) => lambda.ty(context),
+            Expr::Match(m) => m.ty(context),
         }
     }
 }

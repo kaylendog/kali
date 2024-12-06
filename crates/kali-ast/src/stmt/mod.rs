@@ -1,15 +1,19 @@
 //! Statements in the AST.
 
+use kali_type::{Type, Typed};
+
 use crate::{Literal, TypeExpr};
 
 mod decl;
+mod func;
 mod module;
 
 pub use decl::*;
-use kali_type::{Type, Typed};
+pub use func::*;
 pub use module::*;
 
 /// A statement in the AST.
+#[derive(Debug, Clone)]
 pub enum Stmt {
     /// An import statement.
     Import(Import),
@@ -21,6 +25,8 @@ pub enum Stmt {
     Type(String, TypeExpr),
     /// A declaration.
     Decl(Decl),
+    /// A function declaration.
+    FuncDecl(FuncDecl),
 }
 
 impl Typed for Stmt {
@@ -40,6 +46,54 @@ impl Typed for Stmt {
                 // but since statements don't have types, we must return never, rather than any
                 // type from further down the AST.
                 decl.ty(context)?;
+                Type::Never
+            }
+            Stmt::FuncDecl(FuncDecl {
+                name,
+                params,
+                ret_ty,
+                body,
+            }) => {
+                // declare return type
+                let ret_ty = ret_ty
+                    .as_ref()
+                    .map(|ty| ty.inner.as_ty())
+                    .unwrap_or_else(|| context.declare_inferred());
+
+                // declare parameters
+                let params: Vec<_> = params
+                    .iter()
+                    .map(|param| {
+                        (
+                            param.name.clone(),
+                            param
+                                .ty
+                                .as_ref()
+                                .map(|ty| ty.as_ty())
+                                .unwrap_or_else(|| context.declare_inferred()),
+                        )
+                    })
+                    .collect();
+
+                context.push().declare_known_iter(params.iter().cloned());
+
+                // declare function itself - done before body to allow for recursion
+                context.declare_known(
+                    name.clone(),
+                    Type::Lambda(
+                        params.iter().map(|(_, ty)| ty).cloned().collect(),
+                        Box::new(ret_ty.clone()),
+                    ),
+                );
+
+                // infer the type of the body
+                let body_ty = body.ty(context)?;
+                ret_ty.unify(&body_ty, context).map_err(|e| {
+                    kali_type::TypeInferenceError::UnificationFailed(body_ty, ret_ty, e)
+                })?;
+
+                context.pop();
+
                 Type::Never
             }
         })

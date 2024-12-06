@@ -1,19 +1,16 @@
 /// An import statement.
-pub struct Import {
-    /// The path to the module being imported.
-    pub path: String,
-    /// A list of symbols to import.
-    pub symbols: Vec<String>,
-}
-
-impl Import {
-    /// Creates a new import statement.
-    pub fn new(path: String, symbols: Vec<String>) -> Self {
-        Self { path, symbols }
-    }
+#[derive(Debug, Clone)]
+pub enum Import {
+    /// A list of named imports, e.g. import { x } from std.bla
+    Named { symbols: Vec<String>, path: String },
+    /// A wildcard import, e.g. import * from std.bla
+    Wildcard { path: String },
+    /// A named wildcard import, e.g. import * as bla from std.bla
+    NamedWildcard { alias: String, path: String },
 }
 
 /// An export statement.
+#[derive(Debug, Clone)]
 pub struct Export {
     /// The symbols to export.
     pub symbols: Vec<String>,

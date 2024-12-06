@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 use bitcode::{Decode, Encode};
 use kali_ast::UnaryOp;
@@ -8,9 +8,20 @@ mod builder;
 
 pub use builder::*;
 
+pub struct ImportPath {}
+
+pub enum Export {
+    Function(String),
+    Constant(),
+}
+
 /// A module in the stack-based intermediate representation.
 #[derive(Debug, Default, Encode, Decode)]
 pub struct Module {
+    /// The module bytecode version.
+    pub version: u16,
+    /// A map of exports.
+    pub imports: HashMap<String, String>,
     /// Functions in the module.
     pub functions: BTreeMap<String, Function>,
 }
@@ -27,6 +38,8 @@ pub struct Function {
 /// An instruction operating on the stack.
 #[derive(Debug, Clone, Display, Encode, Decode)]
 pub enum Operator {
+    /// No operation.
+    Noop,
     /// Push an integer literal onto the stack.
     #[strum(serialize = "pushi {0}")]
     PushInt(i64),
