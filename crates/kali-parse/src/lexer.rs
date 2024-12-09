@@ -74,14 +74,17 @@ pub enum Token<'src> {
     #[token("|")]
     SymPipe,
     // indentation - ignores trailing whitespace at ends of lines
-    #[regex("[\t ]*\n", |_| Indent { length: 0, kind: IndentationKind::Unknown })]
-    #[regex("[\t ]*\n\t+", |lex| Indent { length: indent_length(lex), kind: IndentationKind::Tabs })]
-    #[regex("[\t ]*\n +", |lex| Indent { length: indent_length(lex), kind: IndentationKind::Spaces })]
+    #[regex("[\n\t ]*\n", |_| Indent { length: 0, kind: IndentationKind::Unknown })]
+    #[regex("[\n\t ]*\n\t+", |lex| Indent { length: indent_length(lex), kind: IndentationKind::Tabs })]
+    #[regex("[\n\t ]*\n +", |lex| Indent { length: indent_length(lex), kind: IndentationKind::Spaces })]
     Newline(Indent),
     /// Signals the start of a block.
     BlockStart,
     /// Signals the end of a block.
     BlockEnd,
+
+    #[regex("[\n\t ]*#.*", logos::skip)]
+    Ignored,
 }
 
 /// Stores the length and kind of an indentation.
@@ -131,12 +134,8 @@ fn prefixed_integer<'src>(lex: &mut logos::Lexer<'src, Token<'src>>) -> Option<i
 }
 
 fn indent_length<'src>(lex: &mut logos::Lexer<'src, Token<'src>>) -> usize {
-    // ignore any leading whitespace
-    lex.slice()
-        .chars()
-        .skip_while(|c| *c == ' ' || *c == '\t')
-        .skip(1)
-        .count()
+    let last_newline = lex.slice().rfind('\n').unwrap();
+    lex.slice()[last_newline..].len() - 1
 }
 
 /// A lexer capable of denesting blocks using indentation by replacing block delimiters with parentheses.
@@ -145,20 +144,22 @@ pub struct DenestedLexer<'src> {
     level: usize,
     kind: IndentationKind,
     size: usize,
+    unindents: usize,
 }
 
+/// An enumeration of possible errors that can occur during lexing.
 #[derive(Default, Debug, Clone, PartialEq)]
 pub enum LexerError {
+    /// An unknown error occurred.
     #[default]
     Unknown,
+    /// A bad type of indentation character was found.
     BadIndentationCharacter {
         expected: IndentationKind,
         found: IndentationKind,
     },
-    BadIndentationSize {
-        expected: usize,
-        actual: usize,
-    },
+    /// A bad size of indentation was found.
+    BadIndentationSize { expected: usize, actual: usize },
 }
 
 impl<'src> DenestedLexer<'src> {
@@ -169,12 +170,17 @@ impl<'src> DenestedLexer<'src> {
             level: 0,
             size: 0,
             kind: IndentationKind::Unknown,
+            unindents: 0,
         }
     }
 
     /// Returns the next token from the lexer.
     pub fn next(&mut self) -> Option<Result<Token<'src>, LexerError>> {
-        // indenting
+        if self.unindents > 0 {
+            self.unindents -= 1;
+            return Some(Ok(Token::BlockEnd));
+        }
+
         let indent = match self.lexer.next()? {
             Ok(Token::Newline(indent)) => indent,
             Ok(token) => return Some(Ok(token)),
@@ -186,10 +192,23 @@ impl<'src> DenestedLexer<'src> {
             self.kind = indent.kind;
             self.size = indent.length;
         } else if self.kind != indent.kind {
+            // indent kind is only unknown if it's de-nesting of one or more blocks
+            if indent.kind == IndentationKind::Unknown {
+                self.unindents = self.level - 1;
+                self.level = 0;
+                return Some(Ok(Token::BlockEnd));
+            }
+
+            // otherwise, the user is using the wrong kind of indentation
             return Some(Err(LexerError::BadIndentationCharacter {
                 expected: self.kind.clone(),
                 found: indent.kind,
             }));
+        }
+
+        // if the indent length is 0, then this is just a newline - emit next
+        if indent.length == 0 {
+            return self.lexer.next();
         }
 
         // depth = length / size
@@ -231,9 +250,7 @@ impl<'src> Iterator for DenestedLexer<'src> {
 mod tests {
     use logos::Logos;
 
-    use crate::lexer::Token;
-
-    use super::DenestedLexer;
+    use super::{DenestedLexer, Token};
 
     #[test]
     fn natural() {
@@ -280,8 +297,10 @@ mod tests {
 
     #[test]
     fn block() {
-        let src = include_str!("../tests/lexer/fib.kali");
-        let tokens: Vec<_> = DenestedLexer::new(src).collect();
+        let src = include_str!("../tests/lexer.kali");
+        let tokens = DenestedLexer::new(src)
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
         println!("{:?}", tokens);
     }
 }
