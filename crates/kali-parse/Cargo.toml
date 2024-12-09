@@ -5,5 +5,12 @@ edition = "2021"
 
 [dependencies]
 chumsky = { version = "1.0.0-alpha.7", features = ["label"] }
+logos = "0.15"
+unicode-ident = "1"
 
 kali-ast = { path = "../kali-ast" }
+
+tracing = { workspace = true }
+
+[dev-dependencies]
+tracing-subscriber = { workspace = true }
