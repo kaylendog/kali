@@ -22,7 +22,7 @@ pub enum Expr {
     /// A literal value.
     Literal(Literal),
     /// An identifier.
-    Identifier(String),
+    Ident(String),
     /// A binary expression.
     BinaryExpr(BinaryExpr),
     /// A unary expression.
@@ -49,7 +49,7 @@ impl Typed for Expr {
     fn ty(&self, mut context: &mut Context) -> Result<Type, TypeInferenceError> {
         match self {
             Expr::Literal(literal) => literal.ty(&mut context),
-            Expr::Identifier(name) => Ok(context
+            Expr::Ident(name) => Ok(context
                 .get_known(name)
                 .cloned()
                 .unwrap_or_else(|| context.declare_inferred())),

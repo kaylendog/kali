@@ -89,11 +89,11 @@ impl Display for Type {
 #[derive(Clone, Debug, PartialEq, strum::Display)]
 pub enum Constant {
     /// A signed integer type.
-    #[strum(serialize = "int")]
-    Int,
+    #[strum(serialize = "integer")]
+    Integer,
     /// An unsigned integer type.
-    #[strum(serialize = "unsigned int")]
-    UnsignedInt,
+    #[strum(serialize = "natural")]
+    Natural,
     /// A floating-point type.
     #[strum(serialize = "float")]
     Float,
@@ -113,14 +113,14 @@ mod tests {
     #[test]
     fn display() {
         assert_eq!(
-            format!("{}", crate::Type::Constant(crate::Constant::Int)),
+            format!("{}", crate::Type::Constant(crate::Constant::Integer)),
             "int"
         );
         // array
         assert_eq!(
             format!(
                 "{}",
-                crate::Type::Array(Box::new(crate::Type::Constant(crate::Constant::Int)))
+                crate::Type::Array(Box::new(crate::Type::Constant(crate::Constant::Integer)))
             ),
             "int[]"
         );

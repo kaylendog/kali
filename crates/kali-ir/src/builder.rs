@@ -192,12 +192,12 @@ impl Compile for Expr {
     fn compile(&self, unit: &mut FunctionBuilder) {
         match self {
             Expr::Literal(literal) => match literal {
-                Literal::Int(value) => unit.pushi(*value),
+                Literal::Integer(value) => unit.pushi(*value),
                 Literal::Float(value) => unit.pushf(*value),
                 Literal::Bool(value) => unit.pushb(*value),
                 _ => todo!("literal compilation"),
             },
-            Expr::Identifier(_) => todo!("identifier compilation"),
+            Expr::Ident(_) => todo!("identifier compilation"),
             Expr::BinaryExpr(binary) => binary.compile(unit),
             Expr::UnaryExpr(unary) => unary.compile(unit),
             Expr::Conditional(conditional) => conditional.compile(unit),
@@ -215,7 +215,7 @@ impl Compile for BinaryExpr {
         let ty = self.lhs.meta.ty.get().unwrap();
         match ty {
             Type::Constant(c) => match c {
-                Constant::Int => match self.operator {
+                Constant::Integer => match self.operator {
                     BinaryOp::Add => unit.addi(),
                     BinaryOp::Subtract => unit.subi(),
                     BinaryOp::Multiply => unit.muli(),

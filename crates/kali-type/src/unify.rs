@@ -94,7 +94,7 @@ mod tests {
 
     #[test]
     fn unify_literals() {
-        let int = Type::Constant(Constant::Int);
+        let int = Type::Constant(Constant::Integer);
         let float = Type::Constant(Constant::Float);
         let bool = Type::Constant(Constant::Bool);
         let string = Type::Constant(Constant::String);
@@ -123,7 +123,7 @@ mod tests {
 
     #[test]
     fn unify_inferred_tuples() {
-        let int = Type::Constant(Constant::Int);
+        let int = Type::Constant(Constant::Integer);
         let tuple_a = Type::Tuple(vec![Type::Infer(0), Type::Infer(1)]);
         let tuple_b = Type::Tuple(vec![int.clone(), int.clone()]);
 
@@ -142,7 +142,7 @@ mod tests {
 
     #[test]
     fn unify_inferred_structs() {
-        let int = Type::Constant(Constant::Int);
+        let int = Type::Constant(Constant::Integer);
         let struct_a = Type::Record(BTreeMap::from_iter(vec![
             ("a".to_string(), Type::Infer(0)),
             ("b".to_string(), Type::Infer(1)),

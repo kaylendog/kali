@@ -18,6 +18,14 @@ pub enum Token<'src> {
     KeywordLet,
     #[token("fn")]
     KeywordFn,
+    #[token("type")]
+    KeywordType,
+    #[token("import")]
+    KeywordImport,
+    #[token("export")]
+    KeywordExport,
+    #[token("as")]
+    KeywordAs,
     #[token("=")]
     OpAssign,
     #[token("==")]
@@ -35,7 +43,7 @@ pub enum Token<'src> {
     #[token("::")]
     OpCons,
     #[regex("[a-zA-Z_][a-zA-Z0-9_]*")]
-    Identifier(&'src str),
+    Ident(&'src str),
     // literals
     #[regex("[0-9][0-9_]*", |lex| lex.slice().parse().ok())]
     #[regex("0x[0-9a-fA-F][0-9a-fA-F_]*", |lex| prefixed_natural(lex))]
@@ -65,6 +73,10 @@ pub enum Token<'src> {
     SymLBracket,
     #[token("]")]
     SymRBracket,
+    #[token("{")]
+    SymLBrace,
+    #[token("}")]
+    SymRBrace,
     #[token(",")]
     SymComma,
     #[token(":")]
@@ -73,6 +85,8 @@ pub enum Token<'src> {
     SymArrow,
     #[token("|")]
     SymPipe,
+    #[token("[]")]
+    SymArray,
     // indentation - ignores trailing whitespace at ends of lines
     #[regex("[\n\t ]*\n", |_| Indent { length: 0, kind: IndentationKind::Unknown })]
     #[regex("[\n\t ]*\n\t+", |lex| Indent { length: indent_length(lex), kind: IndentationKind::Tabs })]

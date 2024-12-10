@@ -9,8 +9,10 @@ use crate::{expr::Expr, Node};
 /// A literal value.
 #[derive(Debug, Clone)]
 pub enum Literal {
+    /// A natural number literal.
+    Natural(u64),
     /// An integer literal.
-    Int(i64),
+    Integer(i64),
     /// A floating-point literal.
     Float(f64),
     /// A boolean literal.
@@ -30,7 +32,7 @@ pub enum Literal {
 impl PartialEq for Literal {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Literal::Int(a), Literal::Int(b)) => a == b,
+            (Literal::Integer(a), Literal::Integer(b)) => a == b,
             (Literal::Float(a), Literal::Float(b)) => a == b,
             (Literal::Bool(a), Literal::Bool(b)) => a == b,
             (Literal::String(a), Literal::String(b)) => a == b,
@@ -46,7 +48,8 @@ impl PartialEq for Literal {
 impl Typed for Literal {
     fn ty(&self, context: &mut Context) -> Result<Type, TypeInferenceError> {
         Ok(match self {
-            Literal::Int(_) => Type::Constant(Constant::Int),
+            Literal::Natural(_) => Type::Constant(Constant::Natural),
+            Literal::Integer(_) => Type::Constant(Constant::Integer),
             Literal::Float(_) => Type::Constant(Constant::Float),
             Literal::Bool(_) => Type::Constant(Constant::Bool),
             Literal::String(_) => Type::Constant(Constant::String),
