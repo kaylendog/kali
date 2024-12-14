@@ -25,7 +25,9 @@ pub enum PatternLiteral {
     /// A literal string pattern.
     String(String),
     /// A literal integer pattern.
-    Int(i64),
+    Integer(i64),
+    /// A literal natural pattern.
+    Natural(u64),
     /// A range pattern.
     Range(i64, i64),
 }

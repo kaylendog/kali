@@ -1,7 +1,7 @@
 //! Defines a parser for [`kali_ast::Pattern`].
 
 use chumsky::{input::ValueInput, prelude::*};
-use kali_ast::{Pattern, Span};
+use kali_ast::{Pattern, PatternLiteral, Span};
 
 use crate::{common::ident, lexer::Token};
 
@@ -15,6 +15,11 @@ where
         // []
         let empty_list = just(Token::SymArray).to(Pattern::EmptyList);
 
+        let literal = select! {
+            Token::LitNatural(nat) => Pattern::Literal(PatternLiteral::Natural(nat)),
+            Token::LitInteger(int) => Pattern::Literal(PatternLiteral::Integer(int))
+        };
+
         // <ident>
         let ident = ident().map(|s| Pattern::Ident(s));
 
@@ -26,7 +31,7 @@ where
             .delimited_by(just(Token::SymLParen), just(Token::SymRParen))
             .map(|p| Pattern::Tuple(p));
 
-        let atom = choice((empty_list, ident, tuple));
+        let atom = choice((ident, empty_list, literal, tuple));
 
         // <atom> :: <cons> | <atom>
         let cons = atom

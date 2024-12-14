@@ -93,6 +93,7 @@ where
             literal().map(Expr::Literal).node(),
             ident().map(Expr::Ident).node(),
         ))
+        .boxed()
         .labelled("atom");
 
         // <unary> -> <op> <unary> | <atom>
@@ -111,46 +112,61 @@ where
                 }),
                 span,
             )
-        });
+        })
+        .boxed();
 
         // <exp> -> <unary> ** <exp> | <unary>
-        let exp = unary.binopl(select! { Token::OpPow => BinaryOp::Exponentiate });
+        let exp = unary
+            .binopl(select! { Token::OpPow => BinaryOp::Exponentiate })
+            .boxed();
 
         // <mul> -> <exp> * <mul> | <exp> / <mul> | <exp> % <mul> | <exp>
-        let mul = exp.binopl(select! {
-            Token::OpMul => BinaryOp::Multiply,
-            Token::OpDiv => BinaryOp::Divide,
-            Token::OpMod => BinaryOp::Modulo,
-        });
+        let mul = exp
+            .binopl(select! {
+                Token::OpMul => BinaryOp::Multiply,
+                Token::OpDiv => BinaryOp::Divide,
+                Token::OpMod => BinaryOp::Modulo,
+            })
+            .boxed();
 
         // add -> <mul> + <add> | <mul> - <add> | <mul>
-        let add = mul.binopl(select! {
-            Token::OpAdd => BinaryOp::Add,
-            Token::OpSub => BinaryOp::Subtract,
-        });
+        let add = mul
+            .binopl(select! {
+                Token::OpAdd => BinaryOp::Add,
+                Token::OpSub => BinaryOp::Subtract,
+            })
+            .boxed();
 
         // logical -> <add> && | || <logical> | <add>
-        let logical = add.binopl(select! {
-            Token::OpAnd => BinaryOp::LogicalAnd,
-            Token::OpOr => BinaryOp::LogicalOr,
-        });
+        let logical = add
+            .binopl(select! {
+                Token::OpAnd => BinaryOp::LogicalAnd,
+                Token::OpOr => BinaryOp::LogicalOr,
+            })
+            .boxed();
 
         // comparison -> <logical> < | <= | > | >= <logical> | <logical>
-        let comparison = logical.binopl(select! {
-            Token::SymLAngle => BinaryOp::LessThan,
-            Token::OpLe => BinaryOp::LessThanOrEqual,
-            Token::SymRAngle => BinaryOp::GreaterThan,
-            Token::OpGe => BinaryOp::GreaterThanOrEqual,
-        });
+        let comparison = logical
+            .binopl(select! {
+                Token::SymLAngle => BinaryOp::LessThan,
+                Token::OpLe => BinaryOp::LessThanOrEqual,
+                Token::SymRAngle => BinaryOp::GreaterThan,
+                Token::OpGe => BinaryOp::GreaterThanOrEqual,
+            })
+            .boxed();
 
         // equality -> <comparison> == | != <equality> | <comparison>
-        let equality = comparison.binopl(select! {
-            Token::OpEq => BinaryOp::Equal,
-            Token::OpNe => BinaryOp::NotEqual,
-        });
+        let equality = comparison
+            .binopl(select! {
+                Token::OpEq => BinaryOp::Equal,
+                Token::OpNe => BinaryOp::NotEqual,
+            })
+            .boxed();
 
         // <atom> :: <atom> | <atom>
-        let cons = equality.binopr(select! { Token::OpCons => BinaryOp::Cons });
+        let cons = equality
+            .binopr(select! { Token::OpCons => BinaryOp::Cons })
+            .boxed();
 
         // <conditional> -> if <expr> then <expr> else <expr>
         let conditional = just(Token::KeywordIf)
@@ -166,7 +182,8 @@ where
                     otherwise: otherwise.boxed(),
                 })
             })
-            .node();
+            .node()
+            .boxed();
 
         // <match> -> match <expr> with <branches>
         let match_expr = just(Token::KeywordMatch)
@@ -182,10 +199,12 @@ where
                     .labelled("branch")
                     .separated_by(just(Token::SymPipe))
                     .allow_leading()
-                    .collect::<Vec<_>>(),
+                    .collect::<Vec<_>>()
+                    .delimited_by(just(Token::BlockStart), just(Token::BlockEnd)),
             )
             .map(|(expr, branches)| Expr::Match(Match::new(expr, branches)))
-            .node();
+            .node()
+            .boxed();
 
         choice((cons, conditional, match_expr))
     })

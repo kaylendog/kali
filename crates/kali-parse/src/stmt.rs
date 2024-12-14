@@ -25,9 +25,10 @@ where
     .collect::<Vec<_>>()
     .labelled("parameters");
 
-    ident()
+    just(Token::KeywordFn)
+        .ignore_then(ident())
         .then(params.or_not())
-        .then_ignore(just(Token::OpEq))
+        .then_ignore(just(Token::OpAssign))
         .then(expr())
         .map(|((name, params), body)| FuncDecl {
             name,
