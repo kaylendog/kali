@@ -7,6 +7,7 @@ edition = "2021"
 
 [dependencies]
 bitcode = "0.6"
+chumsky = { version = "1.0.0-alpha.7" }
 indexmap = "2"
 
 kali-type = { path = "../kali-type" }

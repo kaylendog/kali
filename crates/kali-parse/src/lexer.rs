@@ -1,5 +1,6 @@
 //! A lexer for the Kali programming language.
 
+use kali_ast::Span;
 use logos::Logos;
 
 /// An enumeration of possbile tokens that can be lexed from source code.
@@ -8,6 +9,8 @@ use logos::Logos;
 pub enum Token<'src> {
     #[token("if")]
     KeywordIf,
+    #[token("then")]
+    KeywordThen,
     #[token("else")]
     KeywordElse,
     #[token("match")]
@@ -24,12 +27,20 @@ pub enum Token<'src> {
     KeywordImport,
     #[token("export")]
     KeywordExport,
+    #[token("from")]
+    KeywordFrom,
     #[token("as")]
     KeywordAs,
     #[token("=")]
     OpAssign,
     #[token("==")]
     OpEq,
+    #[token("!=")]
+    OpNe,
+    #[token("<=")]
+    OpLe,
+    #[token(">=")]
+    OpGe,
     #[token("+")]
     OpAdd,
     #[token("-")]
@@ -40,12 +51,22 @@ pub enum Token<'src> {
     OpDiv,
     #[token("%")]
     OpMod,
+    #[token("**")]
+    OpPow,
     #[token("::")]
     OpCons,
-    #[regex("[a-zA-Z_][a-zA-Z0-9_]*")]
+    #[token("!")]
+    OpNeg,
+    #[token("~")]
+    OpBitNot,
+    #[token("&&")]
+    OpAnd,
+    #[token("||")]
+    OpOr,
+    #[regex("(\\w|_)+", priority = 0)]
     Ident(&'src str),
     // literals
-    #[regex("[0-9][0-9_]*", |lex| lex.slice().parse().ok())]
+    #[regex("[0-9][0-9_]*", |lex| lex.slice().parse().ok(), priority = 1)]
     #[regex("0x[0-9a-fA-F][0-9a-fA-F_]*", |lex| prefixed_natural(lex))]
     #[regex("0b[01][01_]*", |lex| prefixed_natural(lex))]
     #[regex("0o[0-7][0-7_]*", |lex| prefixed_natural(lex))]
@@ -87,6 +108,10 @@ pub enum Token<'src> {
     SymPipe,
     #[token("[]")]
     SymArray,
+    #[token("<")]
+    SymLAngle,
+    #[token(">")]
+    SymRAngle,
     // indentation - ignores trailing whitespace at ends of lines
     #[regex("[\n\t ]*\n", |_| Indent { length: 0, kind: IndentationKind::Unknown })]
     #[regex("[\n\t ]*\n\t+", |lex| Indent { length: indent_length(lex), kind: IndentationKind::Tabs })]
@@ -100,6 +125,9 @@ pub enum Token<'src> {
     #[regex("[\n\t ]*#.*", logos::skip)]
     Ignored,
 }
+
+/// A token paired with its span.
+pub type SpannedToken<'src> = (Result<Token<'src>, LexerError>, Span);
 
 /// Stores the length and kind of an indentation.
 #[derive(Debug, Clone, PartialEq)]
@@ -153,8 +181,8 @@ fn indent_length<'src>(lex: &mut logos::Lexer<'src, Token<'src>>) -> usize {
 }
 
 /// A lexer capable of denesting blocks using indentation by replacing block delimiters with parentheses.
-pub struct DenestedLexer<'src> {
-    lexer: logos::Lexer<'src, Token<'src>>,
+pub struct IndentLexer<'src> {
+    lexer: logos::SpannedIter<'src, Token<'src>>,
     level: usize,
     kind: IndentationKind,
     size: usize,
@@ -176,11 +204,11 @@ pub enum LexerError {
     BadIndentationSize { expected: usize, actual: usize },
 }
 
-impl<'src> DenestedLexer<'src> {
+impl<'src> IndentLexer<'src> {
     /// Creates a new denested lexer from the given source code.
     pub fn new(src: &'src str) -> Self {
         Self {
-            lexer: Token::lexer(src),
+            lexer: Token::lexer(src).spanned(),
             level: 0,
             size: 0,
             kind: IndentationKind::Unknown,
@@ -189,16 +217,19 @@ impl<'src> DenestedLexer<'src> {
     }
 
     /// Returns the next token from the lexer.
-    pub fn next(&mut self) -> Option<Result<Token<'src>, LexerError>> {
+    pub fn next(&mut self) -> Option<SpannedToken<'src>> {
         if self.unindents > 0 {
             self.unindents -= 1;
-            return Some(Ok(Token::BlockEnd));
+            return Some((
+                Ok(Token::BlockEnd),
+                Span::new(self.lexer.span().start, self.lexer.span().start),
+            ));
         }
 
-        let indent = match self.lexer.next()? {
-            Ok(Token::Newline(indent)) => indent,
-            Ok(token) => return Some(Ok(token)),
-            Err(e) => return Some(Err(e)),
+        let (indent, span) = match self.lexer.next()? {
+            (Ok(Token::Newline(indent)), span) => (indent, Span::new(span.start, span.end)),
+            (Ok(token), span) => return Some((Ok(token), Span::new(span.start, span.end))),
+            (Err(e), span) => return Some((Err(e), Span::new(span.start, span.end))),
         };
 
         // infer indentation kind if unknown
@@ -210,27 +241,36 @@ impl<'src> DenestedLexer<'src> {
             if indent.kind == IndentationKind::Unknown {
                 self.unindents = self.level - 1;
                 self.level = 0;
-                return Some(Ok(Token::BlockEnd));
+                return Some((Ok(Token::BlockEnd), span));
             }
 
             // otherwise, the user is using the wrong kind of indentation
-            return Some(Err(LexerError::BadIndentationCharacter {
-                expected: self.kind.clone(),
-                found: indent.kind,
-            }));
+            return Some((
+                Err(LexerError::BadIndentationCharacter {
+                    expected: self.kind.clone(),
+                    found: indent.kind,
+                }),
+                span,
+            ));
         }
 
         // if the indent length is 0, then this is just a newline - emit next
         if indent.length == 0 {
-            return self.lexer.next();
+            return self
+                .lexer
+                .next()
+                .map(|(result, span)| (result, Span::new(span.start, span.end)));
         }
 
         // depth = length / size
         if indent.length % self.size != 0 {
-            return Some(Err(LexerError::BadIndentationSize {
-                expected: self.size,
-                actual: indent.length % self.size,
-            }));
+            return Some((
+                Err(LexerError::BadIndentationSize {
+                    expected: self.size,
+                    actual: indent.length % self.size,
+                }),
+                span,
+            ));
         }
 
         let depth = indent.length / self.size;
@@ -238,33 +278,47 @@ impl<'src> DenestedLexer<'src> {
         // if depth is greater than the current level, emit a block start token
         if depth > self.level {
             self.level = depth;
-            return Some(Ok(Token::BlockStart));
+            return Some((Ok(Token::BlockStart), span));
         }
 
         // if depth is less than the current level, emit a block end token
         if depth < self.level {
             self.level = depth;
-            return Some(Ok(Token::BlockEnd));
+            return Some((Ok(Token::BlockEnd), span));
         }
 
         // if depth is equal to the current level, emit the next token
-        self.lexer.next()
+        self.lexer
+            .next()
+            .map(|(result, span)| (result, Span::new(span.start, span.end)))
     }
 }
 
-impl<'src> Iterator for DenestedLexer<'src> {
-    type Item = Result<Token<'src>, LexerError>;
+impl<'src> Iterator for IndentLexer<'src> {
+    type Item = SpannedToken<'src>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.next()
     }
 }
 
+/// Lexes the given source code into a vector of tokens.
+pub fn lex_to_vec<'src>(src: &'src str) -> Vec<SpannedToken<'src>> {
+    IndentLexer::new(src).collect()
+}
+
+/// Unwraps the result of the lexer into a vector of tokens.
+pub fn unwrap_to_vec<'src>(src: &'src str) -> Vec<(Token<'src>, Span)> {
+    IndentLexer::new(src)
+        .map(|(result, span)| (result.unwrap(), span))
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use logos::Logos;
 
-    use super::{DenestedLexer, Token};
+    use super::{IndentLexer, Token};
 
     #[test]
     fn natural() {
@@ -312,9 +366,38 @@ mod tests {
     #[test]
     fn block() {
         let src = include_str!("../tests/lexer.kali");
-        let tokens = DenestedLexer::new(src)
+        let tokens = IndentLexer::new(src)
+            .map(|(token, _)| token)
             .collect::<Result<Vec<_>, _>>()
             .unwrap();
         println!("{:?}", tokens);
+    }
+
+    #[test]
+    fn ident() {
+        // hello
+        assert_eq!(
+            Token::lexer("hello").next(),
+            Some(Ok(Token::Ident("hello")))
+        );
+        // _world
+        assert_eq!(
+            Token::lexer("_world").next(),
+            Some(Ok(Token::Ident("_world")))
+        );
+        // hello_world
+        assert_eq!(
+            Token::lexer("hello_world").next(),
+            Some(Ok(Token::Ident("hello_world")))
+        );
+
+        // 你好
+        assert_eq!(Token::lexer("你好").next(), Some(Ok(Token::Ident("你好"))));
+
+        // привет
+        assert_eq!(
+            Token::lexer("привет").next(),
+            Some(Ok(Token::Ident("привет")))
+        );
     }
 }

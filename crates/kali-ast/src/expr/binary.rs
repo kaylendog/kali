@@ -27,7 +27,7 @@ pub enum BinaryOp {
     BitwiseXor,
     BitwiseShiftLeft,
     BitwiseShiftRight,
-    Concatenate,
+    Cons,
 }
 
 /// A binary expression.

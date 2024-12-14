@@ -1,0 +1,5 @@
+fn map f l = match l with
+    | [] -> []
+    | x :: xs -> (f x) :: map f xs
+
+fn cond f = if f { x }  else 1
