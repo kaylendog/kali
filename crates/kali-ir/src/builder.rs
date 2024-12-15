@@ -203,6 +203,7 @@ impl Compile for Expr {
             Expr::Conditional(conditional) => conditional.compile(unit),
             Expr::Lambda(_) => todo!("lambda compilation"),
             Expr::Match(_) => todo!("match compilation"),
+            Expr::Call(_) => todo!("call compilation"),
         }
     }
 }

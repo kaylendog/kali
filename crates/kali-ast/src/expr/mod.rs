@@ -3,6 +3,7 @@
 use kali_type::{Context, Type, TypeInferenceError, Typed};
 
 mod binary;
+mod call;
 mod conditional;
 mod lambda;
 mod literal;
@@ -10,6 +11,7 @@ mod r#match;
 mod unary;
 
 pub use binary::*;
+pub use call::*;
 pub use conditional::*;
 pub use lambda::*;
 pub use literal::*;
@@ -33,6 +35,8 @@ pub enum Expr {
     Lambda(Lambda),
     /// A match expression.
     Match(Match),
+    /// A function call expression.
+    Call(Call),
 }
 
 impl PartialEq for Expr {
@@ -58,6 +62,7 @@ impl Typed for Expr {
             Expr::Conditional(conditional) => conditional.ty(context),
             Expr::Lambda(lambda) => lambda.ty(context),
             Expr::Match(m) => m.ty(context),
+            Expr::Call(c) => c.ty(context),
         }
     }
 }

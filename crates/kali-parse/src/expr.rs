@@ -1,7 +1,7 @@
 use chumsky::{input::ValueInput, prelude::*};
 use extra::ParserExtra;
 use kali_ast::{
-    BinaryExpr, BinaryOp, Conditional, Expr, Literal, Match, Node, Span, UnaryExpr, UnaryOp,
+    BinaryExpr, BinaryOp, Call, Conditional, Expr, Literal, Match, Node, Span, UnaryExpr, UnaryOp,
 };
 
 use crate::{
@@ -73,6 +73,7 @@ where
         Token::LitNatural(value) => Literal::Natural(value),
         Token::LitString(value) => Literal::String(value.to_string()),
         Token::LitUnit => Literal::Unit,
+        Token::SymArray => Literal::Array(vec![])
     }
 }
 
@@ -115,8 +116,37 @@ where
         })
         .boxed();
 
+        let callable = choice((
+            expr.clone()
+                .delimited_by(just(Token::SymLParen), just(Token::SymRParen)),
+            ident().map(Expr::Ident).node(),
+        ));
+
+        let call = choice((
+            callable
+                .then(choice((
+                    unary
+                        .clone()
+                        .repeated()
+                        .collect::<Vec<_>>()
+                        .map(|v| Some(v)),
+                    just(Token::SymLParen)
+                        .ignore_then(just(Token::SymRParen))
+                        .ignored()
+                        .map(|_| None),
+                )))
+                .map(|(fun, args)| {
+                    Expr::Call(Call {
+                        fun: Box::new(fun),
+                        args: args.unwrap_or_default(),
+                    })
+                })
+                .node(),
+            atom.clone(),
+        ));
+
         // <exp> -> <unary> ** <exp> | <unary>
-        let exp = unary
+        let exp = call
             .binopl(select! { Token::OpPow => BinaryOp::Exponentiate })
             .boxed();
 
