@@ -244,7 +244,19 @@ where
                     .collect::<Vec<_>>()
                     .delimited_by(just(Token::BlockStart), just(Token::BlockEnd)),
             )
-            .map(|(expr, branches)| Expr::Match(Match::new(expr, branches)))
+            .map(|(expr, branches)| {
+                Expr::Match(Match {
+                    expr: expr.boxed(),
+                    branches: branches
+                        .into_iter()
+                        .flat_map(|(patterns, expr)| {
+                            patterns
+                                .into_iter()
+                                .map(move |pattern| (pattern, expr.clone()))
+                        })
+                        .collect(),
+                })
+            })
             .node()
             .boxed();
 

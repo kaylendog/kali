@@ -7,20 +7,11 @@ use crate::{Expr, Node};
 
 /// A unary expression.
 #[derive(Debug, Clone)]
-pub struct UnaryExpr {
+pub struct UnaryExpr<Meta = ()> {
     /// The unary operator.
     pub operator: UnaryOp,
     /// The inner expression.
-    pub inner: Box<Node<Expr>>,
-}
-
-impl UnaryExpr {
-    pub fn new(operator: UnaryOp, inner: Node<Expr>) -> Self {
-        Self {
-            operator,
-            inner: Box::new(inner),
-        }
-    }
+    pub inner: Box<Node<Expr, Meta>>,
 }
 
 /// An enumeration of unary operators.

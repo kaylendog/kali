@@ -5,9 +5,9 @@ use crate::Node;
 use super::Expr;
 
 #[derive(Clone, Debug)]
-pub struct Call {
-    pub fun: Box<Node<Expr>>,
-    pub args: Vec<Node<Expr>>,
+pub struct Call<Meta = ()> {
+    pub fun: Box<Node<Expr, Meta>>,
+    pub args: Vec<Node<Expr, Meta>>,
 }
 
 impl Typed for Call {

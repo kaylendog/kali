@@ -32,23 +32,13 @@ pub enum BinaryOp {
 
 /// A binary expression.
 #[derive(Debug, Clone)]
-pub struct BinaryExpr {
+pub struct BinaryExpr<Meta = ()> {
     /// The left-hand side of the expression.
-    pub lhs: Box<Node<Expr>>,
+    pub lhs: Box<Node<Expr, Meta>>,
     /// The right-hand side of the expression.
-    pub rhs: Box<Node<Expr>>,
+    pub rhs: Box<Node<Expr, Meta>>,
     /// The binary operator.
     pub operator: BinaryOp,
-}
-
-impl BinaryExpr {
-    pub fn new(lhs: Node<Expr>, operator: BinaryOp, rhs: Node<Expr>) -> Self {
-        Self {
-            lhs: Box::new(lhs),
-            rhs: Box::new(rhs),
-            operator,
-        }
-    }
 }
 
 impl Typed for BinaryExpr {

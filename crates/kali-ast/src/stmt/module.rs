@@ -15,10 +15,3 @@ pub struct Export {
     /// The symbols to export.
     pub symbols: Vec<String>,
 }
-
-impl Export {
-    /// Creates a new export statement.
-    pub fn new(symbols: Vec<String>) -> Self {
-        Self { symbols }
-    }
-}

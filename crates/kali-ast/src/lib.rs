@@ -13,7 +13,6 @@ mod ty;
 
 pub use attr::*;
 pub use expr::*;
-pub use meta::*;
 pub use pattern::*;
 pub use stmt::*;
 pub use ty::*;
@@ -113,7 +112,7 @@ impl chumsky::span::Span for Span {
 
 /// A node in the AST, with an associated span and metadata.
 #[derive(Debug, Clone)]
-pub struct Node<T> {
+pub struct Node<T, Meta = ()> {
     /// The inner node.
     pub inner: T,
     /// Metadata associated with the node.
@@ -127,7 +126,7 @@ impl<T> Node<T> {
     pub fn new<S: Into<Span>>(inner: T, span: S) -> Self {
         Self {
             inner,
-            meta: Meta::default(),
+            meta: (),
             span: span.into(),
         }
     }

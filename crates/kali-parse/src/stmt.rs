@@ -20,6 +20,7 @@ where
             .then(ty_expr())
             .map(|(name, ty)| FuncDeclParam { name, ty: Some(ty) }),
     ))
+    .node()
     .labelled("parameter")
     .repeated()
     .collect::<Vec<_>>()

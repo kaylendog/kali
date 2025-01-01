@@ -6,24 +6,11 @@ use crate::{Expr, Node, TypeExpr};
 
 /// A lambda expression.
 #[derive(Debug, Clone)]
-pub struct Lambda {
+pub struct Lambda<Meta = ()> {
     /// The parameters to the function.
-    pub params: Vec<Parameter>,
+    pub params: Vec<Node<Parameter, Meta>>,
     /// The body of the function.
-    pub body: Box<Node<Expr>>,
-}
-
-impl Lambda {
-    /// Creates a new lambda expression.
-    pub fn new(params: Vec<String>, body: Node<Expr>) -> Self {
-        Self {
-            params: params
-                .into_iter()
-                .map(|name| Parameter { name, ty: None })
-                .collect(),
-            body: Box::new(body),
-        }
-    }
+    pub body: Box<Node<Expr, Meta>>,
 }
 
 /// A parameter to the lambda.
@@ -43,8 +30,9 @@ impl Typed for Lambda {
             .iter()
             .map(|param| {
                 (
-                    param.name.clone(),
+                    param.inner.name.clone(),
                     param
+                        .inner
                         .ty
                         .as_ref()
                         .map(|ty| ty.as_ty())

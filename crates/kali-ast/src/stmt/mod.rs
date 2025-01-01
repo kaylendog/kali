@@ -65,8 +65,9 @@ impl Typed for Stmt {
                     .iter()
                     .map(|param| {
                         (
-                            param.name.clone(),
+                            param.inner.name.clone(),
                             param
+                                .inner
                                 .ty
                                 .as_ref()
                                 .map(|ty| ty.as_ty())

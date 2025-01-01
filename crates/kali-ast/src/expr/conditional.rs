@@ -6,23 +6,13 @@ use crate::{Expr, Node};
 
 /// A conditional expression.
 #[derive(Debug, Clone)]
-pub struct Conditional {
+pub struct Conditional<Meta = ()> {
     /// The condition to check.
-    pub condition: Box<Node<Expr>>,
+    pub condition: Box<Node<Expr, Meta>>,
     /// The body of the conditional.
-    pub body: Box<Node<Expr>>,
+    pub body: Box<Node<Expr, Meta>>,
     /// The body of the else branch.
-    pub otherwise: Box<Node<Expr>>,
-}
-
-impl Conditional {
-    pub fn new(condition: Node<Expr>, body: Node<Expr>, otherwise: Node<Expr>) -> Self {
-        Self {
-            condition: Box::new(condition),
-            body: Box::new(body),
-            otherwise: Box::new(otherwise),
-        }
-    }
+    pub otherwise: Box<Node<Expr, Meta>>,
 }
 
 impl PartialEq for Conditional {

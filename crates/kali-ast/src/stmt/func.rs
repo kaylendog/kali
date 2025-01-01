@@ -2,32 +2,15 @@ use crate::{Expr, Node, TypeExpr};
 
 /// A named function declaration.
 #[derive(Debug, Clone)]
-pub struct FuncDecl {
+pub struct FuncDecl<Meta = ()> {
     /// The name of the function.
     pub name: String,
     /// The parameters of the function.
-    pub params: Vec<FuncDeclParam>,
+    pub params: Vec<Node<FuncDeclParam, Meta>>,
     /// The return type of the function.
-    pub ret_ty: Option<Node<TypeExpr>>,
+    pub ret_ty: Option<Node<TypeExpr, Meta>>,
     /// The body of the function.
-    pub body: Node<Expr>,
-}
-
-impl FuncDecl {
-    /// Creates a new function declaration.
-    pub fn new(
-        name: String,
-        params: Vec<FuncDeclParam>,
-        ret_ty: Option<Node<TypeExpr>>,
-        body: Node<Expr>,
-    ) -> Self {
-        Self {
-            name,
-            params,
-            ret_ty,
-            body,
-        }
-    }
+    pub body: Node<Expr, Meta>,
 }
 
 #[derive(Debug, Clone)]

@@ -7,27 +7,11 @@ use super::Expr;
 
 /// A match expression.
 #[derive(Debug, Clone)]
-pub struct Match {
+pub struct Match<Meta = ()> {
     /// THe expression to test.
-    pub expr: Box<Node<Expr>>,
+    pub expr: Box<Node<Expr, Meta>>,
     /// Branches of the match expression.
-    pub branches: IndexMap<Pattern, Node<Expr>>,
-}
-
-impl Match {
-    pub fn new(expr: Node<Expr>, branches: Vec<(Vec<Pattern>, Node<Expr>)>) -> Self {
-        Self {
-            expr: Box::new(expr),
-            branches: branches
-                .into_iter()
-                .flat_map(|(patterns, expr)| {
-                    patterns
-                        .into_iter()
-                        .map(move |pattern| (pattern, expr.clone()))
-                })
-                .collect(),
-        }
-    }
+    pub branches: IndexMap<Pattern, Node<Expr, Meta>>,
 }
 
 impl Typed for Match {
