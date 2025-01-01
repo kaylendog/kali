@@ -124,10 +124,12 @@ where
 
         let call = choice((
             callable
+                .clone()
                 .then(choice((
                     unary
                         .clone()
                         .repeated()
+                        .at_least(1)
                         .collect::<Vec<_>>()
                         .map(|v| Some(v)),
                     just(Token::SymLParen)
@@ -139,6 +141,16 @@ where
                     Expr::Call(Call {
                         fun: Box::new(fun),
                         args: args.unwrap_or_default(),
+                    })
+                })
+                .node(),
+            callable
+                .then_ignore(just(Token::SymLParen))
+                .then_ignore(just(Token::SymRParen))
+                .map(|atom| {
+                    Expr::Call(Call {
+                        fun: Box::new(atom),
+                        args: vec![],
                     })
                 })
                 .node(),

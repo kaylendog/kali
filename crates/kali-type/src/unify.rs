@@ -71,6 +71,25 @@ impl Type {
 
                 Ok(Type::Record(fields.into_iter().collect()))
             }
+            // lambda types unify if their parameter and return types unify
+            (Type::Lambda(lhs_params, lhs_ret), Type::Lambda(rhs_params, rhs_ret)) => {
+                // ensure the number of parameters match
+                if lhs_params.len() != rhs_params.len() {
+                    return Err(TypeUnificationError::MismatchedLength(
+                        lhs_params.len(),
+                        rhs_params.len(),
+                    ));
+                }
+                // unify parameters
+                let params = lhs_params
+                    .iter()
+                    .zip(rhs_params)
+                    .map(|(a, b)| a.unify(b, context))
+                    .collect::<Result<Vec<_>, _>>()?;
+                // unify return types
+                let ret = lhs_ret.unify(rhs_ret, context)?;
+                Ok(Type::Lambda(params, Box::new(ret)))
+            }
             // otherwise, the types must be identical
             (x, y) => {
                 if x == y {
