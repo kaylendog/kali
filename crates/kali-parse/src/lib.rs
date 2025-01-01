@@ -1,11 +1,25 @@
-use kali_ast::{Node, Stmt};
-use lalrpop_util::{lalrpop_mod, lexer::Token};
+mod common;
+mod expr;
+pub mod lexer;
+mod pattern;
+mod stmt;
+mod ty_expr;
 
-lalrpop_mod!(pub grammar);
+pub use lexer::{IndentLexer, Token};
 
-pub type ParseError<'src> = lalrpop_util::ParseError<usize, Token<'src>, &'static str>;
+use chumsky::{
+    error::Rich,
+    input::{Input, Stream},
+    Parser,
+};
 
-/// Parse a string into an AST.
-pub fn parse_str<'src>(input: &'src str) -> Result<Vec<Node<Stmt>>, ParseError<'src>> {
-    grammar::StmtsParser::new().parse(input)
+use kali_ast::{Module, Span};
+use lexer::unwrap_to_vec;
+use stmt::module;
+
+/// Parse a string into a Kali module.
+pub fn parse_str<'src>(input: &'src str) -> Result<Module, Vec<Rich<'src, Token<'src>, Span>>> {
+    let tokens = unwrap_to_vec(input);
+    let input = Stream::from_iter(tokens).spanned(Span::eoi(input));
+    module().parse(input).into_result()
 }

@@ -1,0 +1,5 @@
+fn milamber a b = match a with
+    | 0 -> b
+    | x -> match b with
+        | 0 -> a
+        | y -> x + y

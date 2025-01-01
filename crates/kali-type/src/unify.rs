@@ -71,6 +71,25 @@ impl Type {
 
                 Ok(Type::Record(fields.into_iter().collect()))
             }
+            // lambda types unify if their parameter and return types unify
+            (Type::Lambda(lhs_params, lhs_ret), Type::Lambda(rhs_params, rhs_ret)) => {
+                // ensure the number of parameters match
+                if lhs_params.len() != rhs_params.len() {
+                    return Err(TypeUnificationError::MismatchedLength(
+                        lhs_params.len(),
+                        rhs_params.len(),
+                    ));
+                }
+                // unify parameters
+                let params = lhs_params
+                    .iter()
+                    .zip(rhs_params)
+                    .map(|(a, b)| a.unify(b, context))
+                    .collect::<Result<Vec<_>, _>>()?;
+                // unify return types
+                let ret = lhs_ret.unify(rhs_ret, context)?;
+                Ok(Type::Lambda(params, Box::new(ret)))
+            }
             // otherwise, the types must be identical
             (x, y) => {
                 if x == y {
@@ -94,7 +113,7 @@ mod tests {
 
     #[test]
     fn unify_literals() {
-        let int = Type::Constant(Constant::Int);
+        let int = Type::Constant(Constant::Integer);
         let float = Type::Constant(Constant::Float);
         let bool = Type::Constant(Constant::Bool);
         let string = Type::Constant(Constant::String);
@@ -123,7 +142,7 @@ mod tests {
 
     #[test]
     fn unify_inferred_tuples() {
-        let int = Type::Constant(Constant::Int);
+        let int = Type::Constant(Constant::Integer);
         let tuple_a = Type::Tuple(vec![Type::Infer(0), Type::Infer(1)]);
         let tuple_b = Type::Tuple(vec![int.clone(), int.clone()]);
 
@@ -142,7 +161,7 @@ mod tests {
 
     #[test]
     fn unify_inferred_structs() {
-        let int = Type::Constant(Constant::Int);
+        let int = Type::Constant(Constant::Integer);
         let struct_a = Type::Record(BTreeMap::from_iter(vec![
             ("a".to_string(), Type::Infer(0)),
             ("b".to_string(), Type::Infer(1)),

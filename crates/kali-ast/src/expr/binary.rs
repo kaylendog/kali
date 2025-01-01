@@ -27,7 +27,7 @@ pub enum BinaryOp {
     BitwiseXor,
     BitwiseShiftLeft,
     BitwiseShiftRight,
-    Concatenate,
+    Cons,
 }
 
 /// A binary expression.
@@ -66,7 +66,7 @@ impl Typed for BinaryExpr {
                     | BinaryOp::GreaterThanOrEqual => {
                         // require the inner type to be a constant
                         inner
-                            .unify(&Type::Constant(Constant::Int), context)
+                            .unify(&Type::Constant(Constant::Integer), context)
                             .map(|_| Type::Constant(Constant::Bool))
                     }
                     BinaryOp::LogicalAnd | BinaryOp::LogicalOr => {

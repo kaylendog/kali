@@ -30,7 +30,7 @@ impl TypeExpr {
     pub fn as_ty(&self) -> Type {
         match self {
             TypeExpr::Constant(primitive) => match primitive {
-                ConstantType::Int => Type::Constant(Constant::Int),
+                ConstantType::Int => Type::Constant(Constant::Integer),
                 ConstantType::Float => Type::Constant(Constant::Float),
                 ConstantType::Bool => Type::Constant(Constant::Bool),
                 ConstantType::String => Type::Constant(Constant::String),

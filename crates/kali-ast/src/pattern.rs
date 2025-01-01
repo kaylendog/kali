@@ -8,11 +8,13 @@ pub enum Pattern {
     /// A wildcard pattern.
     Wildcard,
     /// An identifier pattern.
-    Identifier(String),
-    /// A literal pattern.
-    Tuple(Vec<Pattern>),
+    Ident(String),
     /// A tuple pattern.
+    Tuple(Vec<Pattern>),
+    /// A cons pattern.
     Cons(Box<Pattern>, Box<Pattern>),
+    /// The empty list pattern.
+    EmptyList,
     /// A literal pattern.
     Literal(PatternLiteral),
 }
@@ -23,7 +25,9 @@ pub enum PatternLiteral {
     /// A literal string pattern.
     String(String),
     /// A literal integer pattern.
-    Int(i64),
+    Integer(i64),
+    /// A literal natural pattern.
+    Natural(u64),
     /// A range pattern.
     Range(i64, i64),
 }

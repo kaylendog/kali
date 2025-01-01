@@ -52,6 +52,7 @@ impl Typed for Lambda {
                 )
             })
             .collect();
+
         // unnecessary cloning?
         context.push().declare_known_iter(params.clone());
 

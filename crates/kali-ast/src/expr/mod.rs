@@ -3,6 +3,7 @@
 use kali_type::{Context, Type, TypeInferenceError, Typed};
 
 mod binary;
+mod call;
 mod conditional;
 mod lambda;
 mod literal;
@@ -10,6 +11,7 @@ mod r#match;
 mod unary;
 
 pub use binary::*;
+pub use call::*;
 pub use conditional::*;
 pub use lambda::*;
 pub use literal::*;
@@ -22,7 +24,7 @@ pub enum Expr {
     /// A literal value.
     Literal(Literal),
     /// An identifier.
-    Identifier(String),
+    Ident(String),
     /// A binary expression.
     BinaryExpr(BinaryExpr),
     /// A unary expression.
@@ -33,6 +35,8 @@ pub enum Expr {
     Lambda(Lambda),
     /// A match expression.
     Match(Match),
+    /// A function call expression.
+    Call(Call),
 }
 
 impl PartialEq for Expr {
@@ -49,7 +53,7 @@ impl Typed for Expr {
     fn ty(&self, mut context: &mut Context) -> Result<Type, TypeInferenceError> {
         match self {
             Expr::Literal(literal) => literal.ty(&mut context),
-            Expr::Identifier(name) => Ok(context
+            Expr::Ident(name) => Ok(context
                 .get_known(name)
                 .cloned()
                 .unwrap_or_else(|| context.declare_inferred())),
@@ -58,6 +62,7 @@ impl Typed for Expr {
             Expr::Conditional(conditional) => conditional.ty(context),
             Expr::Lambda(lambda) => lambda.ty(context),
             Expr::Match(m) => m.ty(context),
+            Expr::Call(c) => c.ty(context),
         }
     }
 }

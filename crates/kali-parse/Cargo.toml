@@ -4,9 +4,13 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-lalrpop-util = { version = "0.22", features = ["lexer", "unicode"] }
+chumsky = { version = "1.0.0-alpha.7", features = ["label"] }
+logos = "0.15"
+unicode-ident = "1"
 
 kali-ast = { path = "../kali-ast" }
 
-[build-dependencies]
-lalrpop = "0.22"
+tracing = { workspace = true }
+
+[dev-dependencies]
+tracing-subscriber = { workspace = true }
