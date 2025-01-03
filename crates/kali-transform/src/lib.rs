@@ -1,3 +1,5 @@
+use kali_type::{Context, Type, TypeInferenceError};
+
 /// A trait implemented by AST transforms.
 pub trait Transform {
     /// The transformation context.
@@ -115,6 +117,7 @@ pub trait Transform {
         })
     }
 
+    /// Transform a function declaration parameter.
     fn transform_func_decl_param(
         &self,
         context: &mut Self::Context,
@@ -139,7 +142,7 @@ pub trait Transform {
         Ok(ty)
     }
 
-    /// Transform a node.
+    /// Transform an expression.
     fn transform_expr(
         &self,
         context: &mut Self::Context,
@@ -173,6 +176,7 @@ pub trait Transform {
         }
     }
 
+    /// Transform a literal.
     fn transform_literal(
         &self,
         context: &mut Self::Context,
@@ -212,6 +216,7 @@ pub trait Transform {
         })
     }
 
+    /// Transform an identifier.
     fn transform_ident(
         &self,
         context: &mut Self::Context,
@@ -220,6 +225,7 @@ pub trait Transform {
         Ok(ident)
     }
 
+    /// Transform a binary expression.
     fn transform_binary_expr(
         &self,
         context: &mut Self::Context,
@@ -232,6 +238,7 @@ pub trait Transform {
         })
     }
 
+    /// Transform a unary expression.
     fn transform_unary_expr(
         &self,
         context: &mut Self::Context,
@@ -245,6 +252,7 @@ pub trait Transform {
         })
     }
 
+    /// Transform a conditional expression.
     fn transform_conditional(
         &self,
         context: &mut Self::Context,
@@ -263,6 +271,7 @@ pub trait Transform {
         })
     }
 
+    /// Transform a lambda expression.
     fn transform_lambda(
         &self,
         context: &mut Self::Context,
@@ -271,6 +280,7 @@ pub trait Transform {
         todo!()
     }
 
+    /// Transform a match expression.
     fn transform_match(
         &self,
         context: &mut Self::Context,
@@ -288,6 +298,7 @@ pub trait Transform {
         })
     }
 
+    /// Transform a function call.
     fn transform_call(
         &self,
         context: &mut Self::Context,
@@ -303,58 +314,24 @@ pub trait Transform {
         })
     }
 
+    /// Transform a node containing an expression.
     fn transform_node_expr(
         &self,
         context: &mut Self::Context,
         node: kali_ast::Node<kali_ast::Expr<Self::MetaInput>, Self::MetaInput>,
     ) -> Result<kali_ast::Node<kali_ast::Expr<Self::MetaOutput>, Self::MetaOutput>, Self::Error>;
 
+    /// Transform a node containing a function declaration parameter.
     fn transform_node_func_decl_param(
         &self,
         context: &mut Self::Context,
         node: kali_ast::Node<kali_ast::FuncDeclParam, Self::MetaInput>,
     ) -> Result<kali_ast::Node<kali_ast::FuncDeclParam, Self::MetaOutput>, Self::Error>;
 
+    /// Transform a node containing a type expression.
     fn transform_node_type_expr(
         &self,
         context: &mut Self::Context,
         node: kali_ast::Node<kali_ast::TypeExpr, Self::MetaInput>,
     ) -> Result<kali_ast::Node<kali_ast::TypeExpr, Self::MetaOutput>, Self::Error>;
-}
-
-struct TypeCacheTransform;
-
-impl Transform for TypeCacheTransform {
-    type Context;
-
-    type Error;
-
-    type MetaInput;
-
-    type MetaOutput;
-
-    fn transform_node_expr(
-        &self,
-        context: &mut Self::Context,
-        node: kali_ast::Node<kali_ast::Expr<Self::MetaInput>, Self::MetaInput>,
-    ) -> Result<kali_ast::Node<kali_ast::Expr<Self::MetaOutput>, Self::MetaOutput>, Self::Error>
-    {
-        todo!()
-    }
-
-    fn transform_node_func_decl_param(
-        &self,
-        context: &mut Self::Context,
-        node: kali_ast::Node<kali_ast::FuncDeclParam, Self::MetaInput>,
-    ) -> Result<kali_ast::Node<kali_ast::FuncDeclParam, Self::MetaOutput>, Self::Error> {
-        todo!()
-    }
-
-    fn transform_node_type_expr(
-        &self,
-        context: &mut Self::Context,
-        node: kali_ast::Node<kali_ast::TypeExpr, Self::MetaInput>,
-    ) -> Result<kali_ast::Node<kali_ast::TypeExpr, Self::MetaOutput>, Self::Error> {
-        todo!()
-    }
 }
