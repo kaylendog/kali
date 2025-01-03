@@ -10,7 +10,7 @@ pub struct Decl<Meta = ()> {
     /// The name of the declaration.
     pub name: String,
     /// The value of the declaration.
-    pub value: Node<Expr, Meta>,
+    pub value: Node<Expr<Meta>, Meta>,
 }
 
 impl Typed for Decl {

@@ -34,9 +34,9 @@ pub enum BinaryOp {
 #[derive(Debug, Clone)]
 pub struct BinaryExpr<Meta = ()> {
     /// The left-hand side of the expression.
-    pub lhs: Box<Node<Expr, Meta>>,
+    pub lhs: Box<Node<Expr<Meta>, Meta>>,
     /// The right-hand side of the expression.
-    pub rhs: Box<Node<Expr, Meta>>,
+    pub rhs: Box<Node<Expr<Meta>, Meta>>,
     /// The binary operator.
     pub operator: BinaryOp,
 }

@@ -9,9 +9,9 @@ use super::Expr;
 #[derive(Debug, Clone)]
 pub struct Match<Meta = ()> {
     /// THe expression to test.
-    pub expr: Box<Node<Expr, Meta>>,
+    pub expr: Box<Node<Expr<Meta>, Meta>>,
     /// Branches of the match expression.
-    pub branches: IndexMap<Pattern, Node<Expr, Meta>>,
+    pub branches: IndexMap<Pattern, Node<Expr<Meta>, Meta>>,
 }
 
 impl Typed for Match {

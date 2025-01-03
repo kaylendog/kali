@@ -12,7 +12,9 @@ mod stmt;
 mod ty;
 
 pub use attr::*;
+use chumsky::input;
 pub use expr::*;
+use kali_type::{Context, Type};
 pub use pattern::*;
 pub use stmt::*;
 pub use ty::*;
@@ -131,6 +133,16 @@ impl<T> Node<T> {
         }
     }
 
+    pub fn with_meta<M>(self, meta: M) -> Node<T, M> {
+        Node::<T, M> {
+            meta,
+            inner: self.inner,
+            span: self.span,
+        }
+    }
+}
+
+impl<T, M> Node<T, M> {
     /// Return this node's span as a slice of the given source.
     pub fn as_str<'a>(&'a self, source: &'a str) -> &'a str {
         &source[self.span.into_range()]
@@ -152,8 +164,8 @@ where
 }
 
 #[derive(Debug, Clone)]
-pub struct Module {
-    pub stmts: Vec<Stmt>,
+pub struct Module<Meta = ()> {
+    pub stmts: Vec<Stmt<Meta>>,
     pub imports: Vec<Import>,
     pub exports: Vec<Export>,
 }

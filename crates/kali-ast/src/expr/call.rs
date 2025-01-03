@@ -6,8 +6,8 @@ use super::Expr;
 
 #[derive(Clone, Debug)]
 pub struct Call<Meta = ()> {
-    pub fun: Box<Node<Expr, Meta>>,
-    pub args: Vec<Node<Expr, Meta>>,
+    pub fun: Box<Node<Expr<Meta>, Meta>>,
+    pub args: Vec<Node<Expr<Meta>, Meta>>,
 }
 
 impl Typed for Call {

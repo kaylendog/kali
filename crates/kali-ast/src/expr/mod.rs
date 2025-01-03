@@ -20,23 +20,23 @@ pub use unary::*;
 
 /// An expression in the Kali language.
 #[derive(Debug, Clone)]
-pub enum Expr {
+pub enum Expr<Meta = ()> {
     /// A literal value.
-    Literal(Literal),
+    Literal(Literal<Meta>),
     /// An identifier.
     Ident(String),
     /// A binary expression.
-    BinaryExpr(BinaryExpr),
+    BinaryExpr(BinaryExpr<Meta>),
     /// A unary expression.
-    UnaryExpr(UnaryExpr),
+    UnaryExpr(UnaryExpr<Meta>),
     /// A conditional expression.
-    Conditional(Conditional),
+    Conditional(Conditional<Meta>),
     /// A lambda expression.
-    Lambda(Lambda),
+    Lambda(Lambda<Meta>),
     /// A match expression.
-    Match(Match),
+    Match(Match<Meta>),
     /// A function call expression.
-    Call(Call),
+    Call(Call<Meta>),
 }
 
 impl PartialEq for Expr {

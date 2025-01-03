@@ -8,7 +8,7 @@ use crate::{expr::Expr, Node};
 
 /// A literal value.
 #[derive(Debug, Clone)]
-pub enum Literal {
+pub enum Literal<Meta> {
     /// A natural number literal.
     Natural(u64),
     /// An integer literal.
@@ -22,14 +22,14 @@ pub enum Literal {
     /// A unit literal.
     Unit,
     /// An array literal.
-    Array(Vec<Node<Expr>>),
+    Array(Vec<Node<Expr<Meta>, Meta>>),
     /// A tuple literal.
-    Tuple(Vec<Node<Expr>>),
+    Tuple(Vec<Node<Expr<Meta>, Meta>>),
     /// A struct literal.
-    Struct(BTreeMap<String, Node<Expr>>),
+    Struct(BTreeMap<String, Node<Expr<Meta>, Meta>>),
 }
 
-impl PartialEq for Literal {
+impl PartialEq for Literal<()> {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Literal::Integer(a), Literal::Integer(b)) => a == b,
@@ -45,7 +45,7 @@ impl PartialEq for Literal {
     }
 }
 
-impl Typed for Literal {
+impl Typed for Literal<()> {
     fn ty(&self, context: &mut Context) -> Result<Type, TypeInferenceError> {
         Ok(match self {
             Literal::Natural(_) => Type::Constant(Constant::Natural),

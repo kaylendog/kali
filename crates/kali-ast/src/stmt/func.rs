@@ -10,7 +10,7 @@ pub struct FuncDecl<Meta = ()> {
     /// The return type of the function.
     pub ret_ty: Option<Node<TypeExpr, Meta>>,
     /// The body of the function.
-    pub body: Node<Expr, Meta>,
+    pub body: Node<Expr<Meta>, Meta>,
 }
 
 #[derive(Debug, Clone)]

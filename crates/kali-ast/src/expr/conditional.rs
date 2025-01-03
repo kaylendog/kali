@@ -8,11 +8,11 @@ use crate::{Expr, Node};
 #[derive(Debug, Clone)]
 pub struct Conditional<Meta = ()> {
     /// The condition to check.
-    pub condition: Box<Node<Expr, Meta>>,
+    pub condition: Box<Node<Expr<Meta>, Meta>>,
     /// The body of the conditional.
-    pub body: Box<Node<Expr, Meta>>,
+    pub body: Box<Node<Expr<Meta>, Meta>>,
     /// The body of the else branch.
-    pub otherwise: Box<Node<Expr, Meta>>,
+    pub otherwise: Box<Node<Expr<Meta>, Meta>>,
 }
 
 impl PartialEq for Conditional {

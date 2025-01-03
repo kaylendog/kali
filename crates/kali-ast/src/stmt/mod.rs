@@ -14,19 +14,19 @@ pub use module::*;
 
 /// A statement in the AST.
 #[derive(Debug, Clone)]
-pub enum Stmt {
+pub enum Stmt<Meta = ()> {
     /// An import statement.
     Import(Import),
     /// An export statement.
     Export(Export),
     /// A constant declaration.
-    Const(String, Literal),
+    Const(String, Literal<Meta>),
     /// A type declaration.
     Type(String, TypeExpr),
     /// A declaration.
-    Decl(Decl),
+    Decl(Decl<Meta>),
     /// A function declaration.
-    FuncDecl(FuncDecl),
+    FuncDecl(FuncDecl<Meta>),
 }
 
 impl Typed for Stmt {

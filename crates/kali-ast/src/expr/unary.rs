@@ -11,7 +11,7 @@ pub struct UnaryExpr<Meta = ()> {
     /// The unary operator.
     pub operator: UnaryOp,
     /// The inner expression.
-    pub inner: Box<Node<Expr, Meta>>,
+    pub inner: Box<Node<Expr<Meta>, Meta>>,
 }
 
 /// An enumeration of unary operators.
