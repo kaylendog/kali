@@ -12,9 +12,7 @@ mod stmt;
 mod ty;
 
 pub use attr::*;
-use chumsky::input;
 pub use expr::*;
-use kali_type::{Context, Type};
 pub use pattern::*;
 pub use stmt::*;
 pub use ty::*;
@@ -112,7 +110,7 @@ impl chumsky::span::Span for Span {
     }
 }
 
-/// A node in the AST, with an associated span and metadata.
+/// A node in the AST, which wraps an inner value with metadata.
 #[derive(Debug, Clone)]
 pub struct Node<T, Meta = ()> {
     /// The inner node.

@@ -63,7 +63,7 @@ where
 }
 
 pub fn literal<'src, I>(
-) -> impl Parser<'src, I, Literal, extra::Err<Rich<'src, Token<'src>, Span>>> + Clone
+) -> impl Parser<'src, I, Literal<()>, extra::Err<Rich<'src, Token<'src>, Span>>> + Clone
 where
     I: ValueInput<'src, Token = Token<'src>, Span = Span>,
 {
