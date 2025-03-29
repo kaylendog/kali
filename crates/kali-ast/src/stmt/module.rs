@@ -22,7 +22,10 @@ pub enum ImportKind<Meta> {
     /// A wildcard import, e.g. import * from std.bla
     Wildcard { path: String },
     /// A named wildcard import, e.g. import * as bla from std.bla
-    NamedWildcard { alias: String, path: String },
+    NamedWildcard {
+        alias: Identifier<Meta>,
+        path: String,
+    },
 }
 
 /// An export statement.

@@ -17,6 +17,8 @@ pub struct FuncDecl<Meta> {
 
 #[derive(Debug, Clone)]
 pub struct FuncDeclParam<Meta> {
+    /// Meta for this node.
+    pub meta: Meta,
     /// The name of the parameter.
     pub name: Identifier<Meta>,
     /// The type of the parameter.

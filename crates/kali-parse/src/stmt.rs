@@ -9,11 +9,19 @@ where
     I: ValueInput<'src, Token = Token<'src>, Span = Span>,
 {
     let params = choice((
-        identifier().map(|name| FuncDeclParam { name, ty: None }),
+        identifier().map_with(|name, e| FuncDeclParam {
+            meta: e.span(),
+            name,
+            ty: None,
+        }),
         identifier()
             .then_ignore(just(Token::SymColon))
             .then(ty_expr())
-            .map(|(name, ty)| FuncDeclParam { name, ty: Some(ty) }),
+            .map_with(|(name, ty), e| FuncDeclParam {
+                meta: e.span(),
+                name,
+                ty: Some(ty),
+            }),
     ))
     .labelled("parameter")
     .repeated()

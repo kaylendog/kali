@@ -9,6 +9,7 @@ mod unify;
 
 pub use engine::*;
 pub use infer::*;
+use kali_ast::{ConstantType, TypeExpr, TypeExprKind};
 pub use unify::*;
 
 /// A type in the Kali language.
@@ -82,6 +83,55 @@ impl Display for Type {
             Type::Error => write!(f, "error"),
             Type::Never => write!(f, "never"),
         }
+    }
+}
+
+impl<Meta> From<&TypeExpr<Meta>> for Type {
+    fn from(value: &TypeExpr<Meta>) -> Self {
+        match &value.kind {
+            TypeExprKind::Constant(primitive) => match primitive {
+                ConstantType::Int => Type::Constant(Constant::Integer),
+                ConstantType::Float => Type::Constant(Constant::Float),
+                ConstantType::Bool => Type::Constant(Constant::Bool),
+                ConstantType::String => Type::Constant(Constant::String),
+                ConstantType::Unit => Type::Constant(Constant::Unit),
+            },
+            TypeExprKind::Variable(name) => todo!("TypeExpr::Variable"),
+            TypeExprKind::Function(params, ret) => {
+                let params = params.iter().map(|param| param.into()).collect();
+                Type::Lambda(params, Box::new(ret.into()))
+            }
+            TypeExprKind::Tuple(types) => {
+                let types = types.iter().map(|ty| ty.into()).collect();
+                Type::Tuple(types)
+            }
+            TypeExprKind::Array(ty) => Type::Array(Box::new(ty.into())),
+            TypeExprKind::Record(fields) => {
+                let fields = fields
+                    .iter()
+                    .map(|(name, ty)| (name.value.clone(), ty.into()))
+                    .collect();
+                Type::Record(fields)
+            }
+        }
+    }
+}
+
+impl<Meta> From<TypeExpr<Meta>> for Type {
+    fn from(value: TypeExpr<Meta>) -> Self {
+        Self::from(&value)
+    }
+}
+
+impl<Meta> From<Box<TypeExpr<Meta>>> for Type {
+    fn from(value: Box<TypeExpr<Meta>>) -> Self {
+        Self::from(*value)
+    }
+}
+
+impl<Meta> From<&Box<TypeExpr<Meta>>> for Type {
+    fn from(value: &Box<TypeExpr<Meta>>) -> Self {
+        Self::from(&**value)
     }
 }
 

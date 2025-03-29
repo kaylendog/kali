@@ -1,8 +1,11 @@
 //! Implements the type inferrence engine.
 
+use std::collections::HashMap;
+
 use kali_ast::{
-    BinaryExpr, BinaryOp, Call, Conditional, Decl, Export, FuncDecl, Identifier, Import, Lambda,
-    Literal, LiteralKind, Match, Module, Rewriter, TypeExpr, UnaryExpr,
+    BinaryExpr, BinaryOp, Call, Conditional, Decl, Export, FuncDecl, FuncDeclParam, Identifier,
+    Import, ImportKind, Lambda, Literal, LiteralKind, Match, Module, Pattern, PatternKind,
+    Rewriter, TypeExpr, UnaryExpr,
 };
 use kali_parse::Span;
 
@@ -99,32 +102,26 @@ impl Rewriter<UnaryExpr<Span>, UnaryExpr<Meta>, Context, TypeInferenceError>
     }
 }
 
+macro_rules! rewrite_literal_variant {
+    ($node:tt, $x:tt, $variant:ident) => {
+        Literal {
+            meta: Meta::new($node.meta).with_ty(Type::Constant(Constant::$variant)),
+            kind: LiteralKind::$variant($x),
+        }
+    };
+}
+
 impl Rewriter<Literal<Span>, Literal<Meta>, Context, TypeInferenceError> for TypeInferenceEngine {
     fn rewrite(
         ctx: &mut Context,
         node: Literal<Span>,
     ) -> Result<Literal<Meta>, TypeInferenceError> {
         Ok(match node.kind {
-            LiteralKind::Natural(x) => Literal {
-                meta: Meta::new(node.meta).with_ty(Type::Constant(Constant::Natural)),
-                kind: LiteralKind::Natural(x),
-            },
-            LiteralKind::Integer(x) => Literal {
-                meta: Meta::new(node.meta).with_ty(Type::Constant(Constant::Integer)),
-                kind: LiteralKind::Integer(x),
-            },
-            LiteralKind::Float(x) => Literal {
-                meta: Meta::new(node.meta).with_ty(Type::Constant(Constant::Float)),
-                kind: LiteralKind::Float(x),
-            },
-            LiteralKind::Bool(x) => Literal {
-                meta: Meta::new(node.meta).with_ty(Type::Constant(Constant::Bool)),
-                kind: LiteralKind::Bool(x),
-            },
-            LiteralKind::String(x) => Literal {
-                meta: Meta::new(node.meta).with_ty(Type::Constant(Constant::String)),
-                kind: LiteralKind::String(x),
-            },
+            LiteralKind::Natural(x) => rewrite_literal_variant!(node, x, Natural),
+            LiteralKind::Integer(x) => rewrite_literal_variant!(node, x, Integer),
+            LiteralKind::Float(x) => rewrite_literal_variant!(node, x, Float),
+            LiteralKind::Bool(x) => rewrite_literal_variant!(node, x, Bool),
+            LiteralKind::String(x) => rewrite_literal_variant!(node, x, String),
             LiteralKind::Unit => Literal {
                 meta: Meta::new(node.meta).with_ty(Type::Constant(Constant::Unit)),
                 kind: LiteralKind::Unit,
@@ -142,8 +139,37 @@ impl Rewriter<Literal<Span>, Literal<Meta>, Context, TypeInferenceError> for Typ
                     kind: LiteralKind::Array(exprs),
                 }
             }
-            LiteralKind::Tuple(exprs) => todo!(),
-            LiteralKind::Struct(btree_map) => todo!(),
+            LiteralKind::Tuple(exprs) => {
+                let exprs: Vec<_> = exprs
+                    .into_iter()
+                    .map(|expr| Self::rewrite(ctx, expr))
+                    .collect::<Result<_, _>>()?;
+
+                let ty = Type::Tuple(exprs.iter().map(|expr| expr.meta().ty.clone()).collect());
+
+                Literal {
+                    meta: Meta::new(node.meta).with_ty(ty),
+                    kind: LiteralKind::Tuple(exprs),
+                }
+            }
+            LiteralKind::Struct(btree_map) => {
+                let btree_map: std::collections::BTreeMap<_, _> = btree_map
+                    .into_iter()
+                    .map(|(k, v)| Ok((k, Self::rewrite(ctx, v)?)))
+                    .collect::<Result<_, _>>()?;
+
+                let ty = Type::Record(
+                    btree_map
+                        .iter()
+                        .map(|(k, v)| (k.clone(), v.meta().ty.clone()))
+                        .collect(),
+                );
+
+                Literal {
+                    meta: Meta::new(node.meta).with_ty(ty),
+                    kind: LiteralKind::Struct(btree_map),
+                }
+            }
         })
     }
 }
@@ -155,7 +181,10 @@ impl Rewriter<Identifier<Span>, Identifier<Meta>, Context, TypeInferenceError>
         ctx: &mut Context,
         node: Identifier<Span>,
     ) -> Result<Identifier<Meta>, TypeInferenceError> {
-        todo!()
+        Ok(Identifier {
+            meta: Meta::new(node.meta).with_ty(ctx.get_known(&node.value).unwrap().clone()),
+            value: node.value,
+        })
     }
 }
 
@@ -166,37 +195,138 @@ impl Rewriter<Conditional<Span>, Conditional<Meta>, Context, TypeInferenceError>
         ctx: &mut Context,
         node: Conditional<Span>,
     ) -> Result<Conditional<Meta>, TypeInferenceError> {
-        todo!()
+        let condition = Self::rewrite(ctx, node.condition)?;
+        let body = Self::rewrite(ctx, node.body)?;
+        let otherwise = Self::rewrite(ctx, node.otherwise)?;
+
+        // enforce boolean condition
+        condition
+            .meta()
+            .ty
+            .unify(&Type::Constant(Constant::Bool), ctx)
+            .map_err(|err| {
+                TypeInferenceError::UnificationFailed(
+                    condition.meta().ty.clone(),
+                    Type::Constant(Constant::Bool),
+                    err,
+                )
+            })?;
+
+        let ty = body
+            .meta()
+            .ty
+            .unify(&otherwise.meta().ty, ctx)
+            .map_err(|err| {
+                TypeInferenceError::UnificationFailed(
+                    body.meta().ty.clone(),
+                    otherwise.meta().ty.clone(),
+                    err,
+                )
+            })?;
+
+        Ok(Conditional {
+            meta: Meta::new(node.meta).with_ty(ty),
+            condition,
+            body,
+            otherwise,
+        })
     }
 }
 
 impl Rewriter<Lambda<Span>, Lambda<Meta>, Context, TypeInferenceError> for TypeInferenceEngine {
     fn rewrite(ctx: &mut Context, node: Lambda<Span>) -> Result<Lambda<Meta>, TypeInferenceError> {
-        todo!()
+        todo!("lambda")
     }
 }
 
 impl Rewriter<Match<Span>, Match<Meta>, Context, TypeInferenceError> for TypeInferenceEngine {
     fn rewrite(ctx: &mut Context, node: Match<Span>) -> Result<Match<Meta>, TypeInferenceError> {
-        todo!()
+        let expr = Self::rewrite(ctx, node.expr)?;
+        let branches: HashMap<_, _> = node
+            .branches
+            .into_iter()
+            .map(|(pattern, expr)| {
+                let pattern = Self::rewrite(ctx, pattern)?;
+                let expr = Self::rewrite(ctx, expr)?;
+
+                Ok((pattern, expr))
+            })
+            .collect::<Result<_, _>>()?;
+
+        // unify all branches
+        let ty = branches
+            .iter()
+            .map(|(_, expr)| &expr.meta().ty)
+            .fold_unify(ctx)?;
+
+        Ok(Match {
+            meta: Meta::new(node.meta).with_ty(ty),
+            expr,
+            branches,
+        })
     }
 }
 
 impl Rewriter<Call<Span>, Call<Meta>, Context, TypeInferenceError> for TypeInferenceEngine {
     fn rewrite(ctx: &mut Context, node: Call<Span>) -> Result<Call<Meta>, TypeInferenceError> {
-        todo!()
+        let callee = Self::rewrite(ctx, node.fun)?;
+        let args = node
+            .args
+            .into_iter()
+            .map(|arg| Self::rewrite(ctx, arg))
+            .collect::<Result<_, _>>()?;
+
+        Ok(Call {
+            meta: Meta::new(node.meta).with_ty(ctx.declare_inferred()),
+            fun: callee,
+            args,
+        })
     }
 }
 
 impl Rewriter<Import<Span>, Import<Meta>, Context, TypeInferenceError> for TypeInferenceEngine {
     fn rewrite(ctx: &mut Context, node: Import<Span>) -> Result<Import<Meta>, TypeInferenceError> {
-        todo!()
+        Ok(Import {
+            meta: Meta::new(node.meta),
+            kind: Self::rewrite(ctx, node.kind)?,
+        })
+    }
+}
+
+impl Rewriter<ImportKind<Span>, ImportKind<Meta>, Context, TypeInferenceError>
+    for TypeInferenceEngine
+{
+    fn rewrite(
+        ctx: &mut Context,
+        node: ImportKind<Span>,
+    ) -> Result<ImportKind<Meta>, TypeInferenceError> {
+        Ok(match node {
+            ImportKind::Named { symbols, path } => {
+                let symbols = symbols
+                    .into_iter()
+                    .map(|identifier| Self::rewrite(ctx, identifier))
+                    .collect::<Result<_, _>>()?;
+                ImportKind::Named { symbols, path }
+            }
+            ImportKind::Wildcard { path } => ImportKind::Wildcard { path },
+            ImportKind::NamedWildcard { alias, path } => ImportKind::NamedWildcard {
+                alias: Self::rewrite(ctx, alias)?,
+                path,
+            },
+        })
     }
 }
 
 impl Rewriter<Export<Span>, Export<Meta>, Context, TypeInferenceError> for TypeInferenceEngine {
     fn rewrite(ctx: &mut Context, node: Export<Span>) -> Result<Export<Meta>, TypeInferenceError> {
-        todo!()
+        Ok(Export {
+            meta: Meta::new(node.meta),
+            symbols: node
+                .symbols
+                .into_iter()
+                .map(|symbol| Self::rewrite(ctx, symbol))
+                .collect::<Result<_, _>>()?,
+        })
     }
 }
 
@@ -205,13 +335,13 @@ impl Rewriter<TypeExpr<Span>, TypeExpr<Meta>, Context, TypeInferenceError> for T
         ctx: &mut Context,
         node: TypeExpr<Span>,
     ) -> Result<TypeExpr<Meta>, TypeInferenceError> {
-        todo!()
+        todo!("type expr")
     }
 }
 
 impl Rewriter<Decl<Span>, Decl<Meta>, Context, TypeInferenceError> for TypeInferenceEngine {
     fn rewrite(ctx: &mut Context, node: Decl<Span>) -> Result<Decl<Meta>, TypeInferenceError> {
-        todo!()
+        todo!("decl")
     }
 }
 
@@ -220,6 +350,87 @@ impl Rewriter<FuncDecl<Span>, FuncDecl<Meta>, Context, TypeInferenceError> for T
         ctx: &mut Context,
         node: FuncDecl<Span>,
     ) -> Result<FuncDecl<Meta>, TypeInferenceError> {
-        todo!()
+        let params: Vec<_> = node
+            .params
+            .into_iter()
+            .map(|param| Self::rewrite(ctx, param))
+            .collect::<Result<_, _>>()?;
+
+        ctx.push();
+
+        for param in &params {
+            let ty = match &param.ty {
+                Some(ty) => ty.into(),
+                None => ctx.declare_inferred(),
+            };
+            ctx.declare_known(param.name.value.clone(), ty);
+        }
+
+        let body = Self::rewrite(ctx, node.body)?;
+
+        ctx.pop();
+
+        Ok(FuncDecl {
+            meta: Meta::new(node.meta).with_ty(Type::Lambda(
+                params.iter().map(|param| param.meta.ty.clone()).collect(),
+                Box::new(body.meta().ty.clone()),
+            )),
+            name: Self::rewrite(ctx, node.name)?,
+            params,
+            body,
+            ret_ty: node.ret_ty.map(|ty| Self::rewrite(ctx, ty)).transpose()?,
+        })
+    }
+}
+
+impl Rewriter<FuncDeclParam<Span>, FuncDeclParam<Meta>, Context, TypeInferenceError>
+    for TypeInferenceEngine
+{
+    fn rewrite(
+        ctx: &mut Context,
+        node: FuncDeclParam<Span>,
+    ) -> Result<FuncDeclParam<Meta>, TypeInferenceError> {
+        Ok(FuncDeclParam {
+            meta: Meta::new(node.meta),
+            name: Self::rewrite(ctx, node.name)?,
+            ty: node.ty.map(|ty| Self::rewrite(ctx, ty)).transpose()?,
+        })
+    }
+}
+
+impl Rewriter<Pattern<Span>, Pattern<Meta>, Context, TypeInferenceError> for TypeInferenceEngine {
+    fn rewrite(
+        ctx: &mut Context,
+        node: Pattern<Span>,
+    ) -> Result<Pattern<Meta>, TypeInferenceError> {
+        Ok(Pattern {
+            meta: Meta::new(node.meta),
+            kind: Self::rewrite(ctx, node.kind)?,
+        })
+    }
+}
+
+impl Rewriter<PatternKind<Span>, PatternKind<Meta>, Context, TypeInferenceError>
+    for TypeInferenceEngine
+{
+    fn rewrite(
+        ctx: &mut Context,
+        node: PatternKind<Span>,
+    ) -> Result<PatternKind<Meta>, TypeInferenceError> {
+        Ok(match node {
+            PatternKind::Wildcard => PatternKind::Wildcard,
+            PatternKind::Literal(literal) => PatternKind::Literal(literal),
+            PatternKind::Tuple(patterns) => PatternKind::Tuple(
+                patterns
+                    .into_iter()
+                    .map(|pattern| Self::rewrite(ctx, pattern))
+                    .collect::<Result<_, _>>()?,
+            ),
+            PatternKind::EmptyList => PatternKind::EmptyList,
+            PatternKind::Cons(head, tail) => {
+                PatternKind::Cons(Self::rewrite(ctx, head)?, Self::rewrite(ctx, tail)?)
+            }
+            PatternKind::Ident(ident) => PatternKind::Ident(Self::rewrite(ctx, ident)?),
+        })
     }
 }
