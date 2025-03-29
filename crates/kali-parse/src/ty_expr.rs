@@ -1,14 +1,17 @@
 use chumsky::{input::ValueInput, prelude::*};
-use kali_ast::{Span, TypeExpr};
+use kali_ast::{ConstantType, TypeExpr, TypeExprKind};
 
-use crate::Token;
+use crate::{Span, Token};
 
 pub fn ty_expr<'src, I>(
-) -> impl Parser<'src, I, TypeExpr, extra::Err<Rich<'src, Token<'src>, Span>>> + Clone
+) -> impl Parser<'src, I, TypeExpr<Span>, extra::Err<Rich<'src, Token<'src>, Span>>> + Clone
 where
     I: ValueInput<'src, Token = Token<'src>, Span = Span>,
 {
     any()
-        .to(TypeExpr::Constant(kali_ast::ConstantType::Unit))
+        .map_with(|_, e| TypeExpr {
+            meta: e.span(),
+            kind: TypeExprKind::Constant(ConstantType::Unit),
+        })
         .labelled("type expression")
 }

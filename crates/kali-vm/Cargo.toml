@@ -1,8 +1,0 @@
-[package]
-name = "kali-vm"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-kali-ast = { path = "../kali-ast" }
-kali-ir = { path = "../kali-ir" }

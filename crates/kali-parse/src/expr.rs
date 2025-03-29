@@ -1,84 +1,84 @@
 use chumsky::{input::ValueInput, prelude::*};
 use extra::ParserExtra;
 use kali_ast::{
-    BinaryExpr, BinaryOp, Call, Conditional, Expr, Literal, Match, Node, Span, UnaryExpr, UnaryOp,
+    BinaryExpr, BinaryOp, Call, Conditional, Expr, Literal, LiteralKind, Match, UnaryExpr, UnaryOp,
 };
 
 use crate::{
-    common::{ident, ParserExt},
+    common::{identifier, ParserExt},
     pattern::pattern,
-    Token,
+    Span, Token,
 };
 
-trait NodeExprParserExt<'src, I, E>: Parser<'src, I, Node<Expr>, E>
+trait ExprParserExt<'src, I, E>: Parser<'src, I, Expr<Span>, E>
 where
     I: Input<'src, Span = Span>,
     E: ParserExtra<'src, I>,
 {
-    fn binopl<A>(self, op: A) -> impl Parser<'src, I, Node<Expr>, E> + Clone
+    fn binopl<A>(self, op: A) -> impl Parser<'src, I, Expr<Span>, E> + Clone
     where
         Self: Sized + Clone,
         I: Input<'src, Token = Token<'src>>,
         A: Parser<'src, I, BinaryOp, E> + Clone,
     {
         self.operationl(op, |lhs, (op, rhs)| {
-            let span = lhs.span.extend(&rhs.span);
-            Node::new(
-                Expr::BinaryExpr(BinaryExpr {
-                    operator: op,
-                    lhs: lhs.boxed(),
-                    rhs: rhs.boxed(),
-                }),
-                span,
-            )
+            let span = lhs.meta().extend(rhs.meta());
+            Expr::BinaryExpr(BinaryExpr {
+                meta: span,
+                operator: op,
+                lhs: lhs.boxed(),
+                rhs: rhs.boxed(),
+            })
         })
     }
 
-    fn binopr<A>(self, op: A) -> impl Parser<'src, I, Node<Expr>, E> + Clone
+    fn binopr<A>(self, op: A) -> impl Parser<'src, I, Expr<Span>, E> + Clone
     where
         Self: Sized + Clone,
         I: Input<'src, Token = Token<'src>>,
         A: Parser<'src, I, BinaryOp, E> + Clone,
     {
         self.operationr(op, |(lhs, op), rhs| {
-            let span = lhs.span.extend(&rhs.span);
-            Node::new(
-                Expr::BinaryExpr(BinaryExpr {
-                    operator: op,
-                    lhs: lhs.boxed(),
-                    rhs: rhs.boxed(),
-                }),
-                span,
-            )
+            let span = lhs.meta().extend(rhs.meta());
+            Expr::BinaryExpr(BinaryExpr {
+                meta: span,
+                operator: op,
+                lhs: lhs.boxed(),
+                rhs: rhs.boxed(),
+            })
         })
     }
 }
 
-impl<'src, I, E, P> NodeExprParserExt<'src, I, E> for P
+impl<'src, I, E, P> ExprParserExt<'src, I, E> for P
 where
     I: Input<'src, Span = Span>,
     E: ParserExtra<'src, I>,
-    P: Parser<'src, I, Node<Expr>, E>,
+    P: Parser<'src, I, Expr<Span>, E>,
 {
 }
 
 pub fn literal<'src, I>(
-) -> impl Parser<'src, I, Literal, extra::Err<Rich<'src, Token<'src>, Span>>> + Clone
+) -> impl Parser<'src, I, Literal<Span>, extra::Err<Rich<'src, Token<'src>, Span>>> + Clone
 where
     I: ValueInput<'src, Token = Token<'src>, Span = Span>,
 {
     select! {
-        Token::LitBool(value) => Literal::Bool(value),
-        Token::LitInteger(value) => Literal::Integer(value),
-        Token::LitNatural(value) => Literal::Natural(value),
-        Token::LitString(value) => Literal::String(value.to_string()),
-        Token::LitUnit => Literal::Unit,
-        Token::SymArray => Literal::Array(vec![])
+        Token::LitBool(value) => LiteralKind::Bool(value),
+        Token::LitInteger(value) => LiteralKind::Integer(value),
+        Token::LitNatural(value) => LiteralKind::Natural(value),
+        Token::LitString(value) => LiteralKind::String(value.to_string()),
+        Token::LitUnit => LiteralKind::Unit,
+        Token::SymArray => LiteralKind::Array(vec![])
     }
+    .map_with(|kind, tok| Literal {
+        meta: tok.span(),
+        kind,
+    })
 }
 
 pub fn expr<'src, I>(
-) -> impl Parser<'src, I, Node<Expr>, extra::Err<Rich<'src, Token<'src>, Span>>> + Clone
+) -> impl Parser<'src, I, Expr<Span>, extra::Err<Rich<'src, Token<'src>, Span>>> + Clone
 where
     I: ValueInput<'src, Token = Token<'src>, Span = Span>,
 {
@@ -91,8 +91,8 @@ where
             expr.clone()
                 .delimited_by(just(Token::SymLParen), just(Token::SymRParen)),
             // <literal>
-            literal().map(Expr::Literal).node(),
-            ident().map(Expr::Ident).node(),
+            literal().map(Expr::Literal),
+            identifier().map(Expr::Ident),
         ))
         .boxed()
         .labelled("atom");
@@ -102,24 +102,22 @@ where
             Token::OpSub => UnaryOp::Negate,
             Token::OpBitNot => UnaryOp::BitwiseNot,
         }
-        .node()
+        .map_with(|op, e| (op, e.span()))
         .repeated()
-        .foldr(atom.clone(), |op, inner| {
-            let span = op.span.extend(&inner.span);
-            Node::new(
-                Expr::UnaryExpr(UnaryExpr {
-                    operator: op.inner,
-                    inner: inner.boxed(),
-                }),
-                span,
-            )
+        .foldr(atom.clone(), |(op, span): (UnaryOp, Span), inner| {
+            let span = span.extend(inner.meta());
+            Expr::UnaryExpr(UnaryExpr {
+                meta: span,
+                operator: op,
+                inner: inner.boxed(),
+            })
         })
         .boxed();
 
         let callable = choice((
             expr.clone()
                 .delimited_by(just(Token::SymLParen), just(Token::SymRParen)),
-            ident().map(Expr::Ident).node(),
+            identifier().map(Expr::Ident),
         ));
 
         let call = choice((
@@ -137,23 +135,23 @@ where
                         .ignored()
                         .map(|_| None),
                 )))
-                .map(|(fun, args)| {
+                .map_with(|(fun, args), e| {
                     Expr::Call(Call {
+                        meta: e.span(),
                         fun: Box::new(fun),
                         args: args.unwrap_or_default(),
                     })
-                })
-                .node(),
+                }),
             callable
                 .then_ignore(just(Token::SymLParen))
                 .then_ignore(just(Token::SymRParen))
-                .map(|atom| {
+                .map_with(|atom, e| {
                     Expr::Call(Call {
+                        meta: e.span(),
                         fun: Box::new(atom),
                         args: vec![],
                     })
-                })
-                .node(),
+                }),
             atom.clone(),
         ));
 
@@ -217,14 +215,14 @@ where
             .then(expr.clone())
             .then_ignore(just(Token::KeywordElse))
             .then(expr.clone())
-            .map(|((condition, body), otherwise)| {
+            .map_with(|((condition, body), otherwise), e| {
                 Expr::Conditional(Conditional {
+                    meta: e.span(),
                     condition: condition.boxed(),
                     body: body.boxed(),
                     otherwise: otherwise.boxed(),
                 })
             })
-            .node()
             .boxed();
 
         // <match> -> match <expr> with <branches>
@@ -244,8 +242,20 @@ where
                     .collect::<Vec<_>>()
                     .delimited_by(just(Token::BlockStart), just(Token::BlockEnd)),
             )
-            .map(|(expr, branches)| Expr::Match(Match::new(expr, branches)))
-            .node()
+            .map_with(|(expr, branches), e| {
+                Expr::Match(Match {
+                    meta: e.span(),
+                    expr: Box::new(expr),
+                    branches: branches
+                        .into_iter()
+                        .flat_map(|(patterns, expr)| {
+                            patterns
+                                .into_iter()
+                                .map(move |pattern| (pattern, expr.clone()))
+                        })
+                        .collect(),
+                })
+            })
             .boxed();
 
         choice((cons, conditional, match_expr))

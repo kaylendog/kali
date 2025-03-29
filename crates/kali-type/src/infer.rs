@@ -158,27 +158,3 @@ impl TypeInferenceError {
         }
     }
 }
-
-/// Implemented on types that that have a type within the Kali language.
-pub trait Typed {
-    /// Returns the type of the value.
-    fn ty(&self, context: &mut Context) -> Result<Type, TypeInferenceError>;
-}
-
-impl<T> Typed for &T
-where
-    T: Typed,
-{
-    fn ty(&self, context: &mut Context) -> Result<Type, TypeInferenceError> {
-        (*self).ty(context)
-    }
-}
-
-impl<T> Typed for Box<T>
-where
-    T: Typed,
-{
-    fn ty(&self, context: &mut Context) -> Result<Type, TypeInferenceError> {
-        self.as_ref().ty(context)
-    }
-}

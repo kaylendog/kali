@@ -1,7 +1,8 @@
 //! A lexer for the Kali programming language.
 
-use kali_ast::Span;
 use logos::Logos;
+
+use crate::Span;
 
 /// An enumeration of possbile tokens that can be lexed from source code.
 #[derive(Debug, Clone, PartialEq, Logos)]

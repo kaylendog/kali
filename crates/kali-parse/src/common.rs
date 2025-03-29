@@ -2,17 +2,22 @@
 
 use chumsky::{input::ValueInput, prelude::*};
 use extra::ParserExtra;
-use kali_ast::{Node, Span};
+use kali_ast::Identifier;
 
-use crate::lexer::Token;
+use crate::{lexer::Token, span::Span};
 
 /// Parses an identifier.
-pub fn ident<'src, I>(
-) -> impl Parser<'src, I, String, extra::Err<Rich<'src, Token<'src>, Span>>> + Clone
+pub fn identifier<'src, I>(
+) -> impl Parser<'src, I, Identifier<Span>, extra::Err<Rich<'src, Token<'src>, Span>>> + Clone
 where
     I: ValueInput<'src, Token = Token<'src>, Span = Span>,
 {
-    select! { Token::Ident(s) => s.to_owned() }.labelled("identifier")
+    select! { Token::Ident(s) => s.to_owned() }
+        .map_with(|value, e| Identifier {
+            meta: e.span(),
+            value,
+        })
+        .labelled("identifier")
 }
 
 /// A utility trait for extending parsers.
@@ -21,13 +26,6 @@ where
     I: Input<'src, Span = Span>,
     E: ParserExtra<'src, I>,
 {
-    fn node(self) -> impl Parser<'src, I, Node<O>, E> + Clone
-    where
-        Self: Sized + Clone,
-    {
-        self.map_with(|s, e| Node::new(s, e.span()))
-    }
-
     /// Produces a parser capable of parsing a left-associative binary operation.
     fn operationl<A, AO, F>(self, op: A, f: F) -> impl Parser<'src, I, O, E> + Clone
     where

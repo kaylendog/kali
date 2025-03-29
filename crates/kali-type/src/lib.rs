@@ -2,13 +2,12 @@
 
 use std::{collections::BTreeMap, fmt::Display};
 
+mod engine;
 mod infer;
-mod iter;
-mod resolve;
 mod unify;
 
+pub use engine::*;
 pub use infer::*;
-pub use iter::*;
 pub use unify::*;
 
 /// A type in the Kali language.

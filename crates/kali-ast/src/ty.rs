@@ -1,19 +1,30 @@
-use kali_type::{Constant, Type};
+//! Type expressions.
+
+use crate::Identifier;
 
 /// A type expression in the Kali language.
 #[derive(Debug, Clone)]
-pub enum TypeExpr {
+pub struct TypeExpr<Meta> {
+    /// Meta for this node.
+    pub meta: Meta,
+    /// The kind of type expression.
+    pub kind: TypeExprKind<Meta>,
+}
+
+/// An enumeration of type expression kinds.
+#[derive(Debug, Clone)]
+pub enum TypeExprKind<Meta> {
     Constant(ConstantType),
     /// A type variable.
     Variable(String),
     /// A function type.
-    Function(Vec<TypeExpr>, Box<TypeExpr>),
+    Function(Vec<TypeExpr<Meta>>, Box<TypeExpr<Meta>>),
     /// A tuple type.
-    Tuple(Vec<TypeExpr>),
+    Tuple(Vec<TypeExpr<Meta>>),
     /// An array type.
-    Array(Box<TypeExpr>),
+    Array(Box<TypeExpr<Meta>>),
     /// A record type.
-    Record(Vec<(String, TypeExpr)>),
+    Record(Vec<(Identifier<Meta>, TypeExpr<Meta>)>),
 }
 
 /// An enumeration of literal constant types.
@@ -24,36 +35,4 @@ pub enum ConstantType {
     Bool,
     String,
     Unit,
-}
-
-impl TypeExpr {
-    pub fn as_ty(&self) -> Type {
-        match self {
-            TypeExpr::Constant(primitive) => match primitive {
-                ConstantType::Int => Type::Constant(Constant::Integer),
-                ConstantType::Float => Type::Constant(Constant::Float),
-                ConstantType::Bool => Type::Constant(Constant::Bool),
-                ConstantType::String => Type::Constant(Constant::String),
-                ConstantType::Unit => Type::Constant(Constant::Unit),
-            },
-            TypeExpr::Variable(_name) => todo!("TypeExpr::Variable"),
-            TypeExpr::Function(params, ret) => {
-                let params = params.iter().map(|param| param.as_ty()).collect();
-                let ret = ret.as_ty();
-                Type::Lambda(params, Box::new(ret))
-            }
-            TypeExpr::Tuple(types) => {
-                let types = types.iter().map(|ty| ty.as_ty()).collect();
-                Type::Tuple(types)
-            }
-            TypeExpr::Array(ty) => Type::Array(Box::new(ty.as_ty())),
-            TypeExpr::Record(fields) => {
-                let fields = fields
-                    .iter()
-                    .map(|(name, ty)| (name.clone(), ty.as_ty()))
-                    .collect();
-                Type::Record(fields)
-            }
-        }
-    }
 }

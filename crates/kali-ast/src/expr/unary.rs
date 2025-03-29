@@ -1,30 +1,20 @@
 //! Unary expressions.
 
-use bitcode::{Decode, Encode};
-use kali_type::{Context, Type, TypeInferenceError, Typed};
-
-use crate::{Expr, Node};
+use crate::Expr;
 
 /// A unary expression.
 #[derive(Debug, Clone)]
-pub struct UnaryExpr {
+pub struct UnaryExpr<Meta> {
+    /// Meta for this node.
+    pub meta: Meta,
     /// The unary operator.
     pub operator: UnaryOp,
     /// The inner expression.
-    pub inner: Box<Node<Expr>>,
-}
-
-impl UnaryExpr {
-    pub fn new(operator: UnaryOp, inner: Node<Expr>) -> Self {
-        Self {
-            operator,
-            inner: Box::new(inner),
-        }
-    }
+    pub inner: Box<Expr<Meta>>,
 }
 
 /// An enumeration of unary operators.
-#[derive(Debug, Clone, Copy, Encode, Decode)]
+#[derive(Debug, Clone, Copy)]
 pub enum UnaryOp {
     /// The negation operator.
     Negate,
@@ -32,10 +22,4 @@ pub enum UnaryOp {
     LogicalNot,
     /// The bitwise not operator.
     BitwiseNot,
-}
-
-impl Typed for UnaryExpr {
-    fn ty(&self, context: &mut Context) -> Result<Type, TypeInferenceError> {
-        self.inner.ty(context)
-    }
 }

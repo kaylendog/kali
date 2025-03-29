@@ -13,6 +13,4 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 kali-ast = { path = "../kali-ast" }
 kali-parse = { path = "../kali-parse" }
 kali-type = { path = "../kali-type" }
-kali-ir = { path = "../kali-ir" }
-kali-vm = { path = "../kali-vm" }
 kali-error = { path = "../kali-error" }

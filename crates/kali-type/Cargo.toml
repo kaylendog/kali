@@ -8,3 +8,6 @@ strum = { version = "0.26", features = ["derive"] }
 strum_macros = "0.26"
 thiserror = "1"
 tracing = "0.1"
+
+kali-ast = { path = "../kali-ast" }
+kali-parse = { path = "../kali-parse" }

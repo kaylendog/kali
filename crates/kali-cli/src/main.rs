@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use clap::Parser;
-use kali_type::Typed;
+use kali_type::TypeInferenceEngine;
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber::EnvFilter;
 
@@ -69,13 +69,8 @@ fn main() {
             DebugKind::Typecheck { file } => {
                 let contents = std::fs::read_to_string(&file).expect("could not read file");
                 let module = kali_parse::parse_str(&contents).expect("could not parse file");
-                module.stmts.iter().for_each(|stmt| {
-                    let ty = stmt.ty(&mut kali_type::Context::default());
-                    match ty {
-                        Ok(ty) => println!("{:?}", ty),
-                        Err(e) => eprintln!("Type Error: {:?}", e),
-                    }
-                });
+                let module = TypeInferenceEngine::infer(module);
+                println!("{:#?}", module);
             }
         },
     }
