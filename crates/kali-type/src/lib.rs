@@ -4,6 +4,7 @@ use std::{collections::BTreeMap, fmt::Display};
 
 mod engine;
 mod infer;
+mod iter;
 mod unify;
 
 pub use engine::*;
