@@ -5,7 +5,7 @@ use crate::Pattern;
 use super::Expr;
 
 /// A match expression.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Match<Meta> {
     /// Meta for this node.
     pub meta: Meta,

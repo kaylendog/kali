@@ -2,7 +2,7 @@
 
 use crate::{
     BinaryExpr, Call, Conditional, Decl, Export, Expr, FuncDecl, Identifier, Import, Lambda,
-    Literal, Match, Module, Pattern, PatternKind, Stmt, TypeExpr, UnaryExpr,
+    Literal, Match, Module, Stmt, TypeExpr, UnaryExpr,
 };
 
 /// A trait for all types that implement AST meta rewriting.

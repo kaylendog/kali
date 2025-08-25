@@ -1,7 +1,7 @@
 use crate::{Expr, Identifier, TypeExpr};
 
 /// A named function declaration.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct FuncDecl<Meta> {
     /// Meta for this node.
     pub meta: Meta,
@@ -15,7 +15,7 @@ pub struct FuncDecl<Meta> {
     pub body: Box<Expr<Meta>>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct FuncDeclParam<Meta> {
     /// Meta for this node.
     pub meta: Meta,

@@ -3,7 +3,7 @@
 use crate::Identifier;
 
 /// A type expression in the Kali language.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct TypeExpr<Meta> {
     /// Meta for this node.
     pub meta: Meta,
@@ -12,7 +12,7 @@ pub struct TypeExpr<Meta> {
 }
 
 /// An enumeration of type expression kinds.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum TypeExprKind<Meta> {
     Constant(ConstantType),
     /// A type variable.
@@ -28,7 +28,7 @@ pub enum TypeExprKind<Meta> {
 }
 
 /// An enumeration of literal constant types.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum ConstantType {
     Int,
     Float,

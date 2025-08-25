@@ -5,7 +5,7 @@ use crate::TypeExpr;
 use super::Expr;
 
 /// A lambda expression.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Lambda<Meta> {
     /// Meta for this node.
     pub meta: Meta,
@@ -16,7 +16,7 @@ pub struct Lambda<Meta> {
 }
 
 /// A parameter to the lambda.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Parameter<Meta> {
     /// Meta for this node.
     pub meta: Meta,

@@ -3,7 +3,7 @@
 use crate::Expr;
 
 /// A unary expression.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct UnaryExpr<Meta> {
     /// Meta for this node.
     pub meta: Meta,
@@ -14,7 +14,7 @@ pub struct UnaryExpr<Meta> {
 }
 
 /// An enumeration of unary operators.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum UnaryOp {
     /// The negation operator.
     Negate,

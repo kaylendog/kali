@@ -3,7 +3,7 @@
 use super::Expr;
 
 /// An enumeration of binary operators.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum BinaryOp {
     Add,
     Subtract,
@@ -28,7 +28,7 @@ pub enum BinaryOp {
 }
 
 /// A binary expression.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct BinaryExpr<Meta> {
     /// Meta for this node.
     pub meta: Meta,

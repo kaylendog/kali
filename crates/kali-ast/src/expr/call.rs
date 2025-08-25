@@ -2,7 +2,7 @@
 
 use super::Expr;
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Call<Meta> {
     /// Meta for this node.
     pub meta: Meta,

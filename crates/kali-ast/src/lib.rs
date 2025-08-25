@@ -17,7 +17,7 @@ pub use stmt::*;
 pub use ty::*;
 
 /// A module, representing a single file translation unit.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Module<Meta> {
     /// Top-level statements in this module.
     pub stmts: Vec<Stmt<Meta>>,

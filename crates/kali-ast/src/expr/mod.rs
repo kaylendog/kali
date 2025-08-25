@@ -19,7 +19,7 @@ pub use r#match::*;
 pub use unary::*;
 
 /// An expression in the Kali language.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Expr<Meta> {
     /// A literal value.
     Literal(Literal<Meta>),

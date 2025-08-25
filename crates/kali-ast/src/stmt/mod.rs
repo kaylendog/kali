@@ -11,7 +11,7 @@ pub use func::*;
 pub use module::*;
 
 /// A statement in the AST.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Stmt<Meta> {
     /// An import statement.
     Import(Import<Meta>),

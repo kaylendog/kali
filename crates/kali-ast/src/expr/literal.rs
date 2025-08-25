@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 use super::Expr;
 
 /// A literal value.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Literal<Meta> {
     /// Meta for this node.
     pub meta: Meta,
@@ -14,7 +14,7 @@ pub struct Literal<Meta> {
 }
 
 /// The kind of literal value.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum LiteralKind<Meta> {
     /// A natural number literal.
     Natural(u64),
@@ -35,3 +35,6 @@ pub enum LiteralKind<Meta> {
     /// A struct literal.
     Struct(BTreeMap<String, Expr<Meta>>),
 }
+
+// Literal values in the AST should never change, so we can safely perform this comparison.
+impl<Meta: Eq> Eq for LiteralKind<Meta> {}

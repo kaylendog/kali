@@ -3,7 +3,7 @@
 use super::Expr;
 
 /// A conditional expression.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Conditional<Meta> {
     /// Meta for this node.
     pub meta: Meta,

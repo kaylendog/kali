@@ -3,7 +3,7 @@
 use crate::Identifier;
 
 /// An import statement.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Import<Meta> {
     /// Meta for this node.
     pub meta: Meta,
@@ -12,7 +12,7 @@ pub struct Import<Meta> {
 }
 
 /// The kind of import statement.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum ImportKind<Meta> {
     /// A list of named imports, e.g. import { x } from std.bla
     Named {
@@ -29,7 +29,7 @@ pub enum ImportKind<Meta> {
 }
 
 /// An export statement.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Export<Meta> {
     /// Meta for this node.
     pub meta: Meta,

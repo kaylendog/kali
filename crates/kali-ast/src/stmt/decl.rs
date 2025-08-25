@@ -3,7 +3,7 @@
 use crate::Expr;
 
 /// A declaration in the AST.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Decl<Meta> {
     /// The name of the declaration.
     pub name: String,
