@@ -6,4 +6,7 @@ edition = "2024"
 [dependencies]
 thiserror = "2.0.16"
 
-kali-ast = { version = "0.1.0", path = "../kali-ast" }
+kali-ast = { path = "../kali-ast" }
+
+[dev-dependencies]
+kali-parse = { path = "../kali-parse" }

@@ -14,12 +14,15 @@ pub struct UnaryExpr<Meta> {
 }
 
 /// An enumeration of unary operators.
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+#[derive(Debug, strum::Display, Clone, Copy, Eq, PartialEq)]
 pub enum UnaryOp {
     /// The negation operator.
+    #[strum(to_string = "-")]
     Negate,
     /// The logical not operator.
+    #[strum(to_string = "!")]
     LogicalNot,
     /// The bitwise not operator.
+    #[strum(to_string = "~")]
     BitwiseNot,
 }

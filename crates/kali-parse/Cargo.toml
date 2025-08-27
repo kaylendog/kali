@@ -13,4 +13,6 @@ kali-ast = { path = "../kali-ast" }
 tracing = { workspace = true }
 
 [dev-dependencies]
+assert_matches2 = "0.1.2"
+
 tracing-subscriber = { workspace = true }

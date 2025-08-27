@@ -8,11 +8,14 @@ use kali_ast::{
     Rewriter, TypeExpr, UnaryExpr,
 };
 use kali_parse::Span;
+use tracing::trace;
 
 use crate::{iter::TypeRefIterator, Constant, Context, Type, TypeInferenceError};
 
 /// The type inferrence engine.
-pub struct TypeInferenceEngine;
+pub struct TypeInferenceEngine {
+    limit: usize,
+}
 
 impl TypeInferenceEngine {
     /// Infer the types of a module.
@@ -49,10 +52,13 @@ impl Meta {
 impl Rewriter<BinaryExpr<Span>, BinaryExpr<Meta>, Context, TypeInferenceError>
     for TypeInferenceEngine
 {
+    #[tracing::instrument(skip_all)]
     fn rewrite(
         ctx: &mut Context,
         node: BinaryExpr<Span>,
     ) -> Result<BinaryExpr<Meta>, TypeInferenceError> {
+        trace!("Rewriting BinaryExpr");
+
         let lhs = Self::rewrite(ctx, node.lhs)?;
         let rhs = Self::rewrite(ctx, node.rhs)?;
 
@@ -89,10 +95,12 @@ impl Rewriter<BinaryExpr<Span>, BinaryExpr<Meta>, Context, TypeInferenceError>
 impl Rewriter<UnaryExpr<Span>, UnaryExpr<Meta>, Context, TypeInferenceError>
     for TypeInferenceEngine
 {
+    #[tracing::instrument(skip_all)]
     fn rewrite(
         ctx: &mut Context,
         node: UnaryExpr<Span>,
     ) -> Result<UnaryExpr<Meta>, TypeInferenceError> {
+        trace!("Rewriting UnaryExpr");
         let inner = Self::rewrite(ctx, node.inner)?;
         Ok(UnaryExpr {
             meta: Meta::new(node.meta).with_ty(inner.meta().ty.clone()),
@@ -112,10 +120,12 @@ macro_rules! rewrite_literal_variant {
 }
 
 impl Rewriter<Literal<Span>, Literal<Meta>, Context, TypeInferenceError> for TypeInferenceEngine {
+    #[tracing::instrument(skip_all)]
     fn rewrite(
         ctx: &mut Context,
         node: Literal<Span>,
     ) -> Result<Literal<Meta>, TypeInferenceError> {
+        trace!("Rewriting Literal");
         Ok(match node.kind {
             LiteralKind::Natural(x) => rewrite_literal_variant!(node, x, Natural),
             LiteralKind::Integer(x) => rewrite_literal_variant!(node, x, Integer),
@@ -177,10 +187,12 @@ impl Rewriter<Literal<Span>, Literal<Meta>, Context, TypeInferenceError> for Typ
 impl Rewriter<Identifier<Span>, Identifier<Meta>, Context, TypeInferenceError>
     for TypeInferenceEngine
 {
+    #[tracing::instrument(skip_all)]
     fn rewrite(
         ctx: &mut Context,
         node: Identifier<Span>,
     ) -> Result<Identifier<Meta>, TypeInferenceError> {
+        trace!("Rewriting Identifier");
         Ok(Identifier {
             meta: Meta::new(node.meta).with_ty(ctx.get_known(&node.value).unwrap().clone()),
             value: node.value,
@@ -191,10 +203,13 @@ impl Rewriter<Identifier<Span>, Identifier<Meta>, Context, TypeInferenceError>
 impl Rewriter<Conditional<Span>, Conditional<Meta>, Context, TypeInferenceError>
     for TypeInferenceEngine
 {
+    #[tracing::instrument(skip_all)]
     fn rewrite(
         ctx: &mut Context,
         node: Conditional<Span>,
     ) -> Result<Conditional<Meta>, TypeInferenceError> {
+        trace!("Rewriting Conditional");
+
         let condition = Self::rewrite(ctx, node.condition)?;
         let body = Self::rewrite(ctx, node.body)?;
         let otherwise = Self::rewrite(ctx, node.otherwise)?;
@@ -234,13 +249,17 @@ impl Rewriter<Conditional<Span>, Conditional<Meta>, Context, TypeInferenceError>
 }
 
 impl Rewriter<Lambda<Span>, Lambda<Meta>, Context, TypeInferenceError> for TypeInferenceEngine {
+    #[tracing::instrument(skip_all)]
     fn rewrite(ctx: &mut Context, node: Lambda<Span>) -> Result<Lambda<Meta>, TypeInferenceError> {
+        trace!("Rewriting Lambda");
         todo!("lambda")
     }
 }
 
 impl Rewriter<Match<Span>, Match<Meta>, Context, TypeInferenceError> for TypeInferenceEngine {
+    #[tracing::instrument(skip_all)]
     fn rewrite(ctx: &mut Context, node: Match<Span>) -> Result<Match<Meta>, TypeInferenceError> {
+        trace!("Rewriting Match");
         let expr = Self::rewrite(ctx, node.expr)?;
         let branches: HashMap<_, _> = node
             .branches
@@ -268,7 +287,9 @@ impl Rewriter<Match<Span>, Match<Meta>, Context, TypeInferenceError> for TypeInf
 }
 
 impl Rewriter<Call<Span>, Call<Meta>, Context, TypeInferenceError> for TypeInferenceEngine {
+    #[tracing::instrument(skip_all)]
     fn rewrite(ctx: &mut Context, node: Call<Span>) -> Result<Call<Meta>, TypeInferenceError> {
+        trace!("Rewriting Call");
         let callee = Self::rewrite(ctx, node.fun)?;
         let args = node
             .args
@@ -285,7 +306,9 @@ impl Rewriter<Call<Span>, Call<Meta>, Context, TypeInferenceError> for TypeInfer
 }
 
 impl Rewriter<Import<Span>, Import<Meta>, Context, TypeInferenceError> for TypeInferenceEngine {
+    #[tracing::instrument(skip_all)]
     fn rewrite(ctx: &mut Context, node: Import<Span>) -> Result<Import<Meta>, TypeInferenceError> {
+        trace!("Rewriting Import");
         Ok(Import {
             meta: Meta::new(node.meta),
             kind: Self::rewrite(ctx, node.kind)?,
@@ -296,10 +319,12 @@ impl Rewriter<Import<Span>, Import<Meta>, Context, TypeInferenceError> for TypeI
 impl Rewriter<ImportKind<Span>, ImportKind<Meta>, Context, TypeInferenceError>
     for TypeInferenceEngine
 {
+    #[tracing::instrument(skip_all)]
     fn rewrite(
         ctx: &mut Context,
         node: ImportKind<Span>,
     ) -> Result<ImportKind<Meta>, TypeInferenceError> {
+        trace!("Rewriting ImportKind");
         Ok(match node {
             ImportKind::Named { symbols, path } => {
                 let symbols = symbols
@@ -318,6 +343,7 @@ impl Rewriter<ImportKind<Span>, ImportKind<Meta>, Context, TypeInferenceError>
 }
 
 impl Rewriter<Export<Span>, Export<Meta>, Context, TypeInferenceError> for TypeInferenceEngine {
+    #[tracing::instrument(skip_all)]
     fn rewrite(ctx: &mut Context, node: Export<Span>) -> Result<Export<Meta>, TypeInferenceError> {
         Ok(Export {
             meta: Meta::new(node.meta),
@@ -331,25 +357,31 @@ impl Rewriter<Export<Span>, Export<Meta>, Context, TypeInferenceError> for TypeI
 }
 
 impl Rewriter<TypeExpr<Span>, TypeExpr<Meta>, Context, TypeInferenceError> for TypeInferenceEngine {
+    #[tracing::instrument(skip_all)]
     fn rewrite(
         ctx: &mut Context,
         node: TypeExpr<Span>,
     ) -> Result<TypeExpr<Meta>, TypeInferenceError> {
+        trace!("Rewriting TypeExpr");
         todo!("type expr")
     }
 }
 
 impl Rewriter<Decl<Span>, Decl<Meta>, Context, TypeInferenceError> for TypeInferenceEngine {
+    #[tracing::instrument(skip_all)]
     fn rewrite(ctx: &mut Context, node: Decl<Span>) -> Result<Decl<Meta>, TypeInferenceError> {
+        trace!("Rewriting Decl");
         todo!("decl")
     }
 }
 
 impl Rewriter<FuncDecl<Span>, FuncDecl<Meta>, Context, TypeInferenceError> for TypeInferenceEngine {
+    #[tracing::instrument(skip_all)]
     fn rewrite(
         ctx: &mut Context,
         node: FuncDecl<Span>,
     ) -> Result<FuncDecl<Meta>, TypeInferenceError> {
+        trace!("Rewriting FuncDecl");
         let params: Vec<_> = node
             .params
             .into_iter()
@@ -386,23 +418,31 @@ impl Rewriter<FuncDecl<Span>, FuncDecl<Meta>, Context, TypeInferenceError> for T
 impl Rewriter<FuncDeclParam<Span>, FuncDeclParam<Meta>, Context, TypeInferenceError>
     for TypeInferenceEngine
 {
+    #[tracing::instrument(skip_all)]
     fn rewrite(
         ctx: &mut Context,
         node: FuncDeclParam<Span>,
     ) -> Result<FuncDeclParam<Meta>, TypeInferenceError> {
+        trace!("Rewriting FuncDeclParam");
+
+        let type_expr = node.ty.map(|ty| Self::rewrite(ctx, ty)).transpose()?;
+        let ty = type_expr.clone().map(|e| e);
+
         Ok(FuncDeclParam {
             meta: Meta::new(node.meta),
             name: Self::rewrite(ctx, node.name)?,
-            ty: node.ty.map(|ty| Self::rewrite(ctx, ty)).transpose()?,
+            ty: type_expr,
         })
     }
 }
 
 impl Rewriter<Pattern<Span>, Pattern<Meta>, Context, TypeInferenceError> for TypeInferenceEngine {
+    #[tracing::instrument(skip_all)]
     fn rewrite(
         ctx: &mut Context,
         node: Pattern<Span>,
     ) -> Result<Pattern<Meta>, TypeInferenceError> {
+        trace!("Rewriting Pattern");
         Ok(Pattern {
             meta: Meta::new(node.meta),
             kind: Self::rewrite(ctx, node.kind)?,
@@ -413,10 +453,12 @@ impl Rewriter<Pattern<Span>, Pattern<Meta>, Context, TypeInferenceError> for Typ
 impl Rewriter<PatternKind<Span>, PatternKind<Meta>, Context, TypeInferenceError>
     for TypeInferenceEngine
 {
+    #[tracing::instrument(skip_all)]
     fn rewrite(
         ctx: &mut Context,
         node: PatternKind<Span>,
     ) -> Result<PatternKind<Meta>, TypeInferenceError> {
+        trace!("Rewriting PatternKind");
         Ok(match node {
             PatternKind::Wildcard => PatternKind::Wildcard,
             PatternKind::Literal(literal) => PatternKind::Literal(literal),
