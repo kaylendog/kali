@@ -9,6 +9,8 @@ mod rewriter;
 mod stmt;
 mod ty;
 
+use std::ops::Deref;
+
 pub use attr::*;
 pub use expr::*;
 pub use pattern::*;

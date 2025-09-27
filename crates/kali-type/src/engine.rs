@@ -274,8 +274,8 @@ impl Rewriter<Match<Span>, Match<Meta>, Context, TypeInferenceError> for TypeInf
 
         // unify all branches
         let ty = branches
-            .iter()
-            .map(|(_, expr)| &expr.meta().ty)
+            .values()
+            .map(|expr| &expr.meta().ty)
             .fold_unify(ctx)?;
 
         Ok(Match {
@@ -426,7 +426,7 @@ impl Rewriter<FuncDeclParam<Span>, FuncDeclParam<Meta>, Context, TypeInferenceEr
         trace!("Rewriting FuncDeclParam");
 
         let type_expr = node.ty.map(|ty| Self::rewrite(ctx, ty)).transpose()?;
-        let ty = type_expr.clone().map(|e| e);
+        let ty = type_expr.clone();
 
         Ok(FuncDeclParam {
             meta: Meta::new(node.meta),

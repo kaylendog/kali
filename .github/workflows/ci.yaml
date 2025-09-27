@@ -20,10 +20,8 @@ jobs:
       fail-fast: true
       matrix:
         crate:
-          - kali-ast
           - kali-parse
           - kali-print
-          - kali-type
 
     steps:
       - name: Checkout

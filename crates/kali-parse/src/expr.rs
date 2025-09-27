@@ -129,7 +129,7 @@ where
                         .repeated()
                         .at_least(1)
                         .collect::<Vec<_>>()
-                        .map(|v| Some(v)),
+                        .map(Some),
                     just(Token::SymLParen)
                         .ignore_then(just(Token::SymRParen))
                         .ignored()

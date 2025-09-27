@@ -25,6 +25,29 @@ impl<'a> Context<'a> {
     pub fn new(buf: &mut dyn Write) -> Context<'_> {
         Context { depth: 0, buf }
     }
+
+    /// Increases the current indentation depth by one.
+    pub fn increase(&mut self) {
+        self.depth += 1;
+    }
+
+    /// Decreases the current indentation depth by one.
+    pub fn decrease(&mut self) {
+        self.depth -= 1;
+    }
+
+    /// Writes a newline followed by indentation corresponding to the current depth.
+    ///
+    /// # Errors
+    ///
+    /// Returns an `Error` if writing to the buffer fails.
+    pub fn newline(&mut self) -> Result<()> {
+        write!(self, "\n")?;
+        for _ in 0..self.depth {
+            write!(self, "\t")?;
+        }
+        Ok(())
+    }
 }
 
 impl Write for Context<'_> {
@@ -93,15 +116,21 @@ impl<Meta> Print for Literal<Meta> {
             LiteralKind::Unit => write!(ctx, "()")?,
             LiteralKind::Array(exprs) => {
                 write!(ctx, "[")?;
-                for expr in exprs {
+                for (i, expr) in exprs.iter().enumerate() {
                     expr.print(ctx)?;
+                    if i != exprs.len() - 1 {
+                        write!(ctx, ", ")?;
+                    }
                 }
                 write!(ctx, "]")?;
             }
             LiteralKind::Tuple(exprs) => {
                 write!(ctx, "(")?;
-                for expr in exprs {
+                for (i, expr) in exprs.iter().enumerate() {
                     expr.print(ctx)?;
+                    if i != exprs.len() - 1 {
+                        write!(ctx, ", ")?;
+                    }
                 }
                 write!(ctx, ")")?;
             }
@@ -123,7 +152,7 @@ impl<Meta> Print for Identifier<Meta> {
 impl<Meta> Print for BinaryExpr<Meta> {
     fn print(&self, ctx: &mut Context) -> Result<()> {
         self.lhs.print(ctx)?;
-        write!(ctx, "{}", self.operator)?;
+        write!(ctx, " {} ", self.operator)?;
         self.rhs.print(ctx)
     }
 }
@@ -294,7 +323,7 @@ mod tests {
             ]),
             meta: (),
         };
-        assert_eq!(print_to_string(&arr), "[12]");
+        assert_eq!(print_to_string(&arr), "[1, 2]");
     }
 
     #[test]
@@ -312,6 +341,6 @@ mod tests {
             ]),
             meta: (),
         };
-        assert_eq!(print_to_string(&tup), "(12)");
+        assert_eq!(print_to_string(&tup), "(1, 2)");
     }
 }

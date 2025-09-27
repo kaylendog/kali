@@ -22,7 +22,7 @@ where
     /// Folds the iterator into a single type.
     fn fold_unify(mut self, context: &mut Context) -> Result<Type, TypeInferenceError> {
         self.try_fold(context.declare_inferred(), |acc, ty| {
-            acc.unify(&ty, context)
+            acc.unify(ty, context)
                 .map_err(|e| TypeInferenceError::UnificationFailed(ty.clone(), acc, e))
         })
     }

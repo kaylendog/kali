@@ -21,7 +21,7 @@ where
         };
 
         // <ident>
-        let ident = identifier().map(|s| PatternKind::Ident(s));
+        let ident = identifier().map(PatternKind::Ident);
 
         // ( (<pattern> ,) * <pattern> )
         let tuple = pattern
@@ -29,7 +29,7 @@ where
             .at_least(1)
             .collect::<Vec<_>>()
             .delimited_by(just(Token::SymLParen), just(Token::SymRParen))
-            .map(|p| PatternKind::Tuple(p));
+            .map(PatternKind::Tuple);
 
         let atom = choice((ident, empty_list, literal, tuple));
 

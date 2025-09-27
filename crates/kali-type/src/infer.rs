@@ -78,7 +78,7 @@ impl Context {
     where
         I: IntoIterator<Item = (String, Type)>,
     {
-        self.scope_mut().known.extend(iter.into_iter());
+        self.scope_mut().known.extend(iter);
     }
 
     /// Returns the type of an inferred type in the context.

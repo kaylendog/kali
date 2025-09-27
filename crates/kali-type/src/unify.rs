@@ -62,11 +62,11 @@ impl Type {
                 let mut fields = Vec::new();
 
                 // unify fields - no need to sort, as we're using a BTreeMap
-                for ((a_name, a_type), (b_name, b_type)) in a.into_iter().zip(b.into_iter()) {
+                for ((a_name, a_type), (b_name, b_type)) in a.iter().zip(b.iter()) {
                     if a_name != b_name {
                         return Err(TypeUnificationError::MismatchedFields(a_name.clone()));
                     }
-                    fields.push((a_name.clone(), a_type.unify(&b_type, context)?));
+                    fields.push((a_name.clone(), a_type.unify(b_type, context)?));
                 }
 
                 Ok(Type::Record(fields.into_iter().collect()))

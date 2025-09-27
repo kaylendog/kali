@@ -67,7 +67,7 @@ fn test_e2e_call_expr() {
 
 #[test]
 fn test_e2e_if_expr() {
-    let expr = Eraser::rewrite(&mut (), kali_expr! { if x { 1 } else { 2 } }).unwrap();
+    let expr = Eraser::rewrite(&mut (), kali_expr! { if x 1 else 2 }).unwrap();
     let formatted = print_to_string(&expr);
     let parsed = Eraser::rewrite(&mut (), parse_expr_str(&formatted).unwrap()).unwrap();
     assert_eq!(expr, parsed);

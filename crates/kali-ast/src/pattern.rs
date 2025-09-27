@@ -15,7 +15,7 @@ pub struct Pattern<Meta> {
 
 impl<Meta> PartialEq for Pattern<Meta> {
     fn eq(&self, other: &Self) -> bool {
-        return self.kind == other.kind;
+        self.kind == other.kind
     }
 }
 
