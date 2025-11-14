@@ -25,7 +25,7 @@ Specification - Version 1.0
 #set text(size: 11pt)
 #set page(
   footer: [
-    #align(right, counter(page).display())
+    #context align(right, counter(page).display())
   ]
 )
 
@@ -46,7 +46,7 @@ Specification - Version 1.0
 
 Kali is a simple, elegant, and powerful programming language. It is designed to be easy to learn and use, while still being powerful enough to handle complex tasks.
 
-== Motivations 
+== Motivations
 
 == Existing Languages
 
@@ -109,7 +109,15 @@ let x = "Hello, world!"
 
 All strings in Kali are UTF-8 encoded.
 
-=== Composite
+Examples with non-Latin characters and emoji:
+
+```kali
+let greeting = "こんにちは世界"
+let city = "Москва"
+let mood = "Feeling great! 😊"
+```
+
+=== Composite Types
 
 Kali has support for four composite data types:
 
@@ -194,6 +202,13 @@ record = "{" field { "," field } "}"
 field = identifier ":" type
 ```
 
+Fields on a record can be accessed using the `.` operator.
+
+```kali
+let point = { x: 10, y: 20 }
+let x = point.x
+```
+
 === Special
 
 There are a few special data types in Kali, which are used to represent special values.
@@ -211,28 +226,90 @@ let unit = "()'
 
 ==== Never
 
-The never type is a special data type that has no values. It is used to represent a computation that never completes, or a value that can never be produced.
+The `Never` type is a special data type that has no values. It is used to represent a computation that never completes, or a value that can never be produced. It is often used to represent type errors, or to signal that type checking has failed.
 
-It is often used to represent type errors, or to signal that type checking has failed.
-
-```kali
-type Point = { x: Int, y: Int }
-```
-
-Fields on a struct can be accessed using the `.` operator.
-
-```kali
-let point = { x: 10, y: 20 }
-let x = point.x
-```
-
-== Variables
+> *Note:* The `Never` type is a theoretical type used internally by the compiler and type checker. It cannot be written or referenced directly in Kali source code. Programmers will never need to annotate a variable or function as `Never`, nor can a value of type `Never` be constructed or matched in user code.
 
 == Control Flow
 
-== Pattern Matching
+=== If Expressions
 
-Pattern matching is a powerful feature that allows you to destructure complex data types and extract their values.
+Kali uses `if` expressions for conditional logic. Since Kali is a functional language, every `if` must have an accompanying `else` branch to ensure that the expression always produces a value.
+
+The basic syntax is:
+
+```kali
+let result = if condition {
+  expr_if_true
+} else {
+  expr_if_false
+}
+```
+
+Both the `if` and `else` branches must return a value of the same type.
+
+You can chain multiple conditions using `else if`:
+
+```kali
+let sign = if x > 0 {
+  "positive"
+} else if x < 0 {
+  "negative"
+} else {
+  "zero"
+}
+```
+
+Because `if` is an expression, it can be used anywhere a value is expected, such as in variable bindings or function arguments.
+
+=== Pattern Matching
+
+Pattern matching in Kali is inspired by Rust's powerful and expressive match expressions. It allows you to match values against patterns and execute code based on which pattern matches.
+
+The basic syntax is as follows:
+
+```kali
+match value {
+  pattern1 -> expr1,
+  pattern2 -> expr2,
+  _ -> expr_default,
+}
+```
+
+Each arm consists of a pattern, the `->` symbol, and an expression to evaluate if the pattern matches. The `_` pattern is a catch-all that matches any value not matched by previous patterns.
+
+For example, matching on a sum type:
+
+```kali
+type Shape = Circle(Int) | Rectangle(Int, Int)
+
+let area = match shape {
+  Circle(r) => 3.14 * r * r,
+  Rectangle(w, h) => w * h,
+}
+```
+
+You can also use pattern matching with primitive types:
+
+```kali
+let result = match x {
+  0 => "zero",
+  1 => "one",
+  _ => "many",
+}
+```
+
+Patterns can destructure tuples, arrays, and records:
+
+```kali
+let point = (1, 2)
+let description = match point {
+  (0, 0) => "origin",
+  (x, y) => "point",
+}
+```
+
+Pattern matching in Kali is exhaustive: the compiler will warn if not all possible cases are covered, unless a catch-all `_` pattern is provided.
 
 == Functions
 
@@ -247,10 +324,6 @@ let add = x: Int, y: Int => x + y
 let add1 = add 1
 ```
 
-=== Closures
-
-Closures are a special kind of function that can capture variables from their surrounding environment.
-
 = Type System
 
 Kali's type system is heavily inspired by that of TypeScript and OCaml, and is designed to be both expressive and flexible.
@@ -262,6 +335,49 @@ Kali's type system is heavily inspired by that of TypeScript and OCaml, and is d
 = Memory Management
 
 = Modules
+
+== Import and Export
+
+Kali uses an import/export system that allows code to be organized into reusable modules.
+
+=== Exporting
+
+To make functions, types, or values available outside a module, use the `export` keyword:
+
+```kali
+export let PI = 3.1415;
+
+export fn area_circle(r: Float): Float {
+  PI * r * r
+}
+
+export type Point = { x: Int, y: Int };
+```
+
+You can export multiple items from a module. Only exported items are accessible from other modules; non-exported items are private to the module.
+
+=== Importing
+
+To use exported items from another module, use the `import` keyword with path-based syntax. You can import all exported symbols from a module into scope:
+
+```kali
+import example::*;
+```
+
+Or import a specific item:
+
+```kali
+import example::add_one;
+```
+
+You can also import from nested modules or the standard library:
+
+```kali
+import std::result::result;
+import std::vec::vec;
+```
+
+This system allows Kali code to be modular, maintainable, and easy to share, using a concise and familiar path-based import syntax.
 
 = Standard Library
 
@@ -283,7 +399,7 @@ Kali is designed to run on a virtual machine, namely the Kali Virtual Machine (K
 
 == Compiler
 
-The compiler is a collection of tools used to compile Kali source code into its bytecode representation. 
+The compiler is a collection of tools used to compile Kali source code into its bytecode representation.
 
 == Parser
 
