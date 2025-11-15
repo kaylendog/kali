@@ -2,7 +2,7 @@
 
 use chumsky::{input::ValueInput, prelude::*};
 use extra::ParserExtra;
-use kali_ast::Identifier;
+use kali_ast2::Identifier;
 
 use crate::{lexer::Token, span::Span};
 

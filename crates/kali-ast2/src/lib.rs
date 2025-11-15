@@ -1,4 +1,40 @@
-use std::path::PathBuf;
+use std::{ops::Range, path::PathBuf};
+
+/// Represents a span in the source code, including the start and end positions and the file identifier.
+#[derive(Debug, Clone, Copy)]
+pub struct Span {
+    /// The start position of the span (inclusive).
+    pub start: usize,
+    /// The end position of the span (exclusive).
+    pub end: usize,
+    /// The identifier of the file this span belongs to.
+    pub file_id: u32,
+}
+
+impl chumsky::span::Span for Span {
+    type Context = u32;
+    type Offset = usize;
+
+    fn new(context: Self::Context, range: Range<Self::Offset>) -> Self {
+        Span {
+            start: range.start,
+            end: range.end,
+            file_id: context,
+        }
+    }
+
+    fn context(&self) -> Self::Context {
+        self.file_id
+    }
+
+    fn start(&self) -> Self::Offset {
+        self.start
+    }
+
+    fn end(&self) -> Self::Offset {
+        self.end
+    }
+}
 
 /// Represents an item in the source code, such as a function, constant, type, import, or export.
 ///
@@ -7,7 +43,7 @@ use std::path::PathBuf;
 #[derive(Debug, Clone)]
 pub struct Item<T = ItemKind> {
     /// Unique identifier for the item.
-    pub id: usize,
+    pub id: u32,
     /// The span of the item in the source code.
     pub span: Span,
     /// The kind of item (function, constant, type, etc.).
@@ -15,9 +51,6 @@ pub struct Item<T = ItemKind> {
     /// The visibility of the item (private, exported, inherited).
     pub visibility: Visibility,
 }
-
-/// Represents a span in the source code with a start and end position.
-pub type Span = std::ops::Range<usize>;
 
 /// Represents the visibility of an item in the source code.
 #[derive(Debug, Clone, Eq, PartialEq, Default)]
@@ -50,7 +83,7 @@ pub enum ItemKind {
 /// Represents a function declaration in the source code.
 pub struct FnItem {
     /// Unique identifier for the item.
-    pub id: usize,
+    pub id: u32,
     /// The name of the function.
     pub name: Ident,
     /// The parameters of the function.
@@ -63,7 +96,7 @@ pub struct FnItem {
 /// Represents a function parameter, including its name and type.
 pub struct FnParam {
     /// Unique identifier for the item.
-    pub id: usize,
+    pub id: u32,
     /// The name of the parameter.
     pub name: Ident,
     /// The type of the parameter.
@@ -76,11 +109,11 @@ pub struct FnParam {
 #[derive(Debug, Clone)]
 pub struct ConstItem {
     /// Unique identifier for the item.
-    pub id: usize,
+    pub id: u32,
     /// The name of the constant.
     pub name: Ident,
     /// The type of the constant.
-    pub ty: Type,
+    pub ty: Option<Type>,
     /// The content of the constant.
     pub content: Expr,
     /// The span of the constant declaration in the source code.
@@ -91,7 +124,7 @@ pub struct ConstItem {
 #[derive(Debug, Clone)]
 pub struct TypeAliasItem {
     /// Unique identifier for the item.
-    pub id: usize,
+    pub id: u32,
     /// The name of the type alias.
     pub name: Ident,
     /// The type that is being aliased.
@@ -104,31 +137,33 @@ pub struct TypeAliasItem {
 #[derive(Debug, Clone)]
 pub struct ImportItem {
     /// Unique identifier for the item.
-    pub id: usize,
+    pub id: u32,
     /// The span of the constant declaration in the source code.
     pub span: Span,
     /// The kind of import (simple, aliased, list, or wildcard).
-    pub kind: ImportKind,
-    /// The path to the imported module or item.
-    pub path: PathBuf,
+    pub kind: ImportTree,
 }
 
 /// Represents the kind of import in an import statement.
 #[derive(Debug, Clone)]
-pub enum ImportKind {
+pub enum ImportTree {
     /// A simple import of a single identifier.
     Simple(Ident),
     /// An import with an alias (original identifier, alias).
     Aliased(Ident, Ident),
     /// An import of a list of import kinds.
-    List(Vec<ImportKind>),
+    List {
+        id: u32,
+        span: Span,
+        children: Vec<ImportTree>,
+    },
 }
 
 /// Represents an export statement in the source code.
 #[derive(Debug, Clone)]
 pub struct ExportItem {
     /// Unique identifier for the item.
-    pub id: usize,
+    pub id: u32,
     /// The span of the constant declaration in the source code.
     pub span: Span,
     /// The kind of export (simple, aliased, list, path list, or wildcard).
@@ -156,9 +191,9 @@ pub enum ExportKind {
 #[derive(Debug, Clone)]
 pub struct Ident {
     /// Unique identifier for the item.
-    pub id: usize,
+    pub id: u32,
     /// The index of the identifier in the table.
-    pub index: usize,
+    pub index: lasso::Spur,
     /// The span of the identifier in the source code.
     pub span: Span,
 }
@@ -167,7 +202,7 @@ pub struct Ident {
 #[derive(Debug, Clone)]
 pub struct Type {
     /// Unique identifier for the item.
-    pub id: usize,
+    pub id: u32,
     /// The span of the type in the source code.
     pub span: Span,
     /// The kind of type (primitive, function, tuple, etc.).
@@ -209,11 +244,67 @@ pub enum PrimitiveTypeKind {
     Unit,
 }
 
+/// Represents a match expression in the source code.
+#[derive(Debug, Clone)]
+pub struct Match {
+    /// Unique identifier for the match expression.
+    pub id: u32,
+    /// The span of the match expression in the source code.
+    pub span: Span,
+    /// The expression being matched on.
+    pub value: Box<Expr>,
+    /// The list of match arms.
+    pub arms: Vec<MatchArm>,
+}
+
+/// Represents a single arm of a match expression.
+#[derive(Debug, Clone)]
+pub struct MatchArm {
+    /// Unique identifier for the match arm.
+    pub id: u32,
+    /// The span of the match arm in the source code.
+    pub span: Span,
+    /// The pattern to match.
+    pub pattern: Pattern,
+    /// The expression to execute if the pattern matches.
+    pub expr: Expr,
+}
+
+/// Represents the kind of pattern in a match arm.
+#[derive(Debug, Clone)]
+pub struct Pattern {
+    /// Unique identifier for the pattern.
+    pub id: u32,
+    /// The span of the pattern in the source code.
+    pub span: Span,
+    /// The kind of pattern (literal, identifier, tuple, etc.).
+    pub kind: PatternKind,
+}
+
+/// The different kinds of patterns.
+#[derive(Debug, Clone)]
+pub enum PatternKind {
+    /// A literal pattern (e.g., `42`, `"foo"`, `true`).
+    Literal(LiteralKind),
+    /// An identifier pattern (e.g., `x`).
+    Ident(Ident),
+    /// A tuple pattern (e.g., `(a, b)`).
+    Tuple(Vec<Pattern>),
+    /// A wildcard pattern (`_`).
+    Wildcard,
+    /// A record pattern (e.g., `{ x, y }`).
+    Record(indexmap::IndexMap<Ident, Pattern>),
+    /// A list pattern (e.g., `[a, b, ..]`).
+    List(Vec<Pattern>),
+    /// An or-pattern (e.g., `A | B`).
+    Or(Vec<Pattern>),
+}
+
 /// Represents an expression item in the source code.
 #[derive(Debug, Clone)]
 pub struct Expr {
     /// Unique identifier for the item.
-    pub id: usize,
+    pub id: u32,
     /// The span of the expression in the source code.
     pub span: Span,
     /// The kind of expression.
@@ -254,6 +345,8 @@ pub enum ExprKind {
         /// The expression to execute if the condition is false (optional).
         otherwise: Option<Box<Expr>>,
     },
+    /// A match expression.
+    Match(Match),
 }
 
 #[derive(Debug, Clone)]
@@ -281,6 +374,7 @@ pub struct BinOp {
     pub span: Span,
 }
 
+/// Represents the kind of binary operator in the source code.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, strum::Display)]
 pub enum BinOpKind {
     #[strum(to_string = "+")]
