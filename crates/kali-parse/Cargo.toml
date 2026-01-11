@@ -1,5 +1,5 @@
 [package]
-name = "kali-parse3"
+name = "kali-parse"
 version = "0.1.0"
 edition = "2024"
 
