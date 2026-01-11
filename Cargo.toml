@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["./crates/*", "crates/kali-ast2", "crates/kali-parse2"]
+members = ["./crates/*", "crates/kali-ast3", "crates/kali-lalrpop", "crates/kali-parse3"]
 
 [workspace.dependencies]
 tracing = "0.1"

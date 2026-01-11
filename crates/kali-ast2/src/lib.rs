@@ -1,7 +1,23 @@
 use std::{ops::Range, path::PathBuf};
 
+/// Contains information about a parsed module.
+pub struct Module {
+    /// Information about the source file.
+    pub src_info: SrcInfo,
+    /// The collection of interned identifiers.
+    pub identifiers: lasso::Rodeo,
+    /// The root items in the module.
+    pub root: Vec<Item>,
+}
+
+/// Contains information about the source file.
+pub struct SrcInfo {
+    /// The file path associated with the source.
+    pub path: PathBuf,
+}
+
 /// Represents a span in the source code, including the start and end positions and the file identifier.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Span {
     /// The start position of the span (inclusive).
     pub start: usize,
@@ -33,6 +49,15 @@ impl chumsky::span::Span for Span {
 
     fn end(&self) -> Self::Offset {
         self.end
+    }
+}
+impl From<chumsky::span::SimpleSpan> for Span {
+    fn from(value: chumsky::span::SimpleSpan) -> Self {
+        Span {
+            file_id: 0,
+            start: value.start,
+            end: value.end,
+        }
     }
 }
 
@@ -188,7 +213,7 @@ pub enum ExportKind {
 }
 
 /// Represents an identifier in the source code, including its textual value and span.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Ident {
     /// Unique identifier for the item.
     pub id: u32,
@@ -199,7 +224,7 @@ pub struct Ident {
 }
 
 /// Represents a type in the source code, including its span and kind.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Type {
     /// Unique identifier for the item.
     pub id: u32,
@@ -210,7 +235,7 @@ pub struct Type {
 }
 
 /// Represents the kind of type in the source code.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub enum TypeKind {
     /// A primitive type (e.g., int, float, bool, string, unit).
     Primitive(PrimitiveTypeKind),
@@ -230,7 +255,7 @@ pub enum TypeKind {
 }
 
 /// Enumeration of primitive types.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PrimitiveTypeKind {
     /// Integer type.
     Int,

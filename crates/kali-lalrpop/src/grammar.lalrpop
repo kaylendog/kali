@@ -1,0 +1,599 @@
+use crate::lexer::{Token, LexicalError};
+use crate::ast::*;
+
+grammar<'src>(
+    cache: &mut lasso::Rodeo
+);
+
+extern {
+  type Location = usize;
+  type Error = LexicalError;
+
+    enum Token<'src> {
+        "if" => Token::KeywordIf,
+        "then" => Token::KeywordThen,
+        "else" => Token::KeywordElse,
+        "match" => Token::KeywordMatch,
+        "with" => Token::KeywordWith,
+        "let" => Token::KeywordLet,
+        "fn" => Token::KeywordFn,
+        "type" => Token::KeywordType,
+        "import" => Token::KeywordImport,
+        "export" => Token::KeywordExport,
+        "from" => Token::KeywordFrom,
+        "as" => Token::KeywordAs,
+        "ty_natural" => Token::TypeNatural,
+        "ty_integer" => Token::TypeInteger,
+        "ty_float" => Token::TypeFloat,
+        "ty_bool" => Token::TypeBool,
+        "ty_string" => Token::TypeString,
+        "=" => Token::OpAssign,
+        "==" => Token::OpEq,
+        "!=" => Token::OpNe,
+        "<=" => Token::OpLe,
+        ">=" => Token::OpGe,
+        "+" => Token::OpAdd,
+        "-" => Token::OpSub,
+        "*" => Token::OpMul,
+        "/" => Token::OpDiv,
+        "%" => Token::OpMod,
+        "**" => Token::OpPow,
+        "::" => Token::OpCons,
+        "!" => Token::OpNeg,
+        "~" => Token::OpBitNot,
+        "&&" => Token::OpAnd,
+        "||" => Token::OpOr,
+        "ident" => Token::Ident(<&'src str>),
+        "lit_natural" => Token::LitNatural(<u64>),
+        "lit_integer" => Token::LitInteger(<i64>),
+        "lit_bool" => Token::LitBool(<bool>),
+        "()" => Token::LitUnit,
+        "lit_string" => Token::LitString(<&'src str>),
+        "(" => Token::SymLParen,
+        ")" => Token::SymRParen,
+        "[" => Token::SymLBracket,
+        "]" => Token::SymRBracket,
+        "{" => Token::SymLBrace,
+        "}" => Token::SymRBrace,
+        "," => Token::SymComma,
+        ":" => Token::SymColon,
+        "->" => Token::SymArrow,
+        "|" => Token::SymPipe,
+        "[]" => Token::SymArray,
+        "<" => Token::SymLAngle,
+        ">" => Token::SymRAngle,
+        "_" => Token::SymWildcard,
+    }
+}
+
+Comma0<T>: Vec<T> = {
+    <mut v:(<T> ",")*> <e:T?> => match e {
+        None => v,
+        Some(e) => {
+            v.push(e);
+            v
+        }
+    }
+};
+
+Comma1<T>: Vec<T> = {
+    <a:T> <mut v:("," <T>)*> ","? => {
+        v.insert(0, a);
+        v
+    }
+};
+
+Comma2<T>: Vec<T> = {
+    <a:T> "," <b:T> <mut v:("," <T>)*> ","? => {
+        v.insert(0, a);
+        v.insert(1, b);
+        v
+    }
+};
+
+Or2<T>: Vec<T> = {
+    "|"? <a:T> "|" <b:T> <mut v:("|" <T>)*> => {
+        v.insert(0, a);
+        v.insert(1, b);
+        v
+    }
+};
+
+pub ExprIdent: Ident = {
+    <left:@L> <ident:"ident"> <right:@R> => Ident {
+        key: cache.get_or_intern(ident),
+        span: Span::new(left, right)
+    }
+}
+
+pub PatternIdent: Ident = {
+    <left:@L> <ident:"ident"> <right:@R> => Ident {
+        key: cache.get_or_intern(ident),
+        span: Span::new(left, right)
+    }
+}
+
+
+pub Item: Item = {
+    <left:@L> <kind:ItemKind> <right:@R> => Item {
+        span: Span::new(left, right),
+        kind,
+        visibility: Visibility::Inherited
+    },
+    <left:@L> "export" <kind:ItemKind> <right:@R> => Item {
+        span: Span::new(left, right),
+        kind,
+        visibility: Visibility::Exported
+    }
+}
+
+pub ItemKind: ItemKind = {
+    <ItemKindImport> => <>,
+    <ItemKindTypeAlias> => <>
+}
+
+pub ItemKindImport: ItemKind = {
+    "import" <ImportTree> => ItemKind::Import(<>)
+}
+
+ImportTreeKind: ImportTreeKind = {
+    <name:ExprIdent> => ImportTreeKind::Item {
+        name,
+        alias: None
+    },
+    <name:ExprIdent> "as" <alias:ExprIdent> => ImportTreeKind::Item {
+        name,
+        alias: Some(alias)
+    },
+    // segment
+     <name:ExprIdent> "::" <child:ImportTree> => ImportTreeKind::Segment {
+        name,
+        child: Box::new(child)
+    },
+    // glob
+    "*" => ImportTreeKind::Glob,
+    // list
+    "{" <children:Comma0<ImportTree>> "}" => ImportTreeKind::List(children)
+}
+
+pub ImportTree: ImportTree = {
+    <left:@L> <kind:ImportTreeKind> <right:@R> => ImportTree {
+        span: Span::new(left, right),
+        kind
+    }
+}
+
+pub Type: Type = {
+    <left:@L> <kind:TypeKind> <right:@R> => Type {
+        span: Span::new(left, right),
+        kind
+    }
+}
+
+TypeKind: TypeKind = {
+    // primitives
+    "ty_natural" => TypeKind::Primitive(PrimitiveTypeKind::Natural),
+    "ty_integer" => TypeKind::Primitive(PrimitiveTypeKind::Integer),
+    "ty_float" => TypeKind::Primitive(PrimitiveTypeKind::Float),
+    "ty_bool" => TypeKind::Primitive(PrimitiveTypeKind::Bool),
+    "ty_string" => TypeKind::Primitive(PrimitiveTypeKind::String),
+    "()" => TypeKind::Primitive(PrimitiveTypeKind::Unit),
+    // named
+    <name:ExprIdent> => TypeKind::Named(name),
+    // tuple
+    "(" <children:Comma0<Type>> ")" => TypeKind::Tuple(children),
+    // list
+    "[" <element:Type> "]" => TypeKind::List(Box::new(element)),
+    // record
+    "{" <entries:Comma0<TypeKindRecordField>> "}" => TypeKind::Record(indexmap::IndexMap::from_iter(entries))
+}
+
+TypeKindRecordField: (ExprIdent, Type) = {
+    <name:ExprIdent> ":" <ty:Type> => (name, ty)
+}
+
+pub ItemKindTypeAlias: ItemKind = {
+    <left:@L> "type" <name:ExprIdent> "=" <ty:Type> <right:@R> => ItemKind::TypeAlias(TypeAlias {
+        span: Span::new(left, right),
+        name,
+        ty
+    })
+}
+
+pub Expr: Expr = {
+    #[precedence(level="0")]
+    <ExprAtom> => <>,
+    "(" <Expr> ")" => <>,
+    #[precedence(level="1")] #[assoc(side="right")]
+    <left:@L> <left_op:@L> "!" <right_op:@R> <expr:Expr> <right:@R> => Expr {
+        span: Span::new(left, right),
+        kind: ExprKind::UnaryExpr {
+            op: UnaryOp {
+                kind: UnaryOpKind::LogicalNot,
+                span: Span::new(left_op, right_op)
+            },
+            expr: Box::new(expr)
+        }
+    },
+    <left:@L> <left_op:@L> "~" <right_op:@R> <expr:Expr> <right:@R> => Expr {
+        span: Span::new(left, right),
+        kind: ExprKind::UnaryExpr {
+            op: UnaryOp {
+                kind: UnaryOpKind::BitwiseNot,
+                span: Span::new(left_op, right_op)
+            },
+            expr: Box::new(expr)
+        }
+    },
+    <left:@L> <left_op:@L> "+" <right_op:@R> <expr:Expr> <right:@R> => Expr {
+        span: Span::new(left, right),
+        kind: ExprKind::UnaryExpr {
+            op: UnaryOp {
+                kind: UnaryOpKind::UnaryPlus,
+                span: Span::new(left_op, right_op)
+            },
+            expr: Box::new(expr)
+        }
+    },
+    <left:@L> <left_op:@L> "-" <right_op:@R> <expr:Expr> <right:@R> => Expr {
+        span: Span::new(left, right),
+        kind: ExprKind::UnaryExpr {
+            op: UnaryOp {
+                kind: UnaryOpKind::Negate,
+                span: Span::new(left_op, right_op)
+            },
+            expr: Box::new(expr)
+        }
+    },
+    #[precedence(level="2")] #[assoc(side="right")]
+    <left:@L> <lhs:Expr> <left_op:@L> "**" <right_op:@R> <rhs:Expr> <right:@R> => Expr {
+        span: Span::new(left, right),
+        kind: ExprKind::BinaryExpr {
+            op: BinaryOp {
+                kind: BinaryOpKind::Exponentiate,
+                span: Span::new(left_op, right_op)
+            },
+            lhs: Box::new(lhs),
+            rhs: Box::new(rhs)
+        }
+    },
+    #[precedence(level="3")] #[assoc(side="left")]
+    <left:@L> <lhs:Expr> <left_op:@L> "*" <right_op:@R> <rhs:Expr> <right:@R> => Expr {
+        span: Span::new(left, right),
+        kind: ExprKind::BinaryExpr {
+            op: BinaryOp {
+                kind: BinaryOpKind::Multiply,
+                span: Span::new(left_op, right_op)
+            },
+            lhs: Box::new(lhs),
+            rhs: Box::new(rhs)
+        }
+    },
+    <left:@L> <lhs:Expr> <left_op:@L> "/" <right_op:@R> <rhs:Expr> <right:@R> => Expr {
+        span: Span::new(left, right),
+        kind: ExprKind::BinaryExpr {
+            op: BinaryOp {
+                kind: BinaryOpKind::Divide,
+                span: Span::new(left_op, right_op)
+            },
+            lhs: Box::new(lhs),
+            rhs: Box::new(rhs)
+        }
+    },
+    <left:@L> <lhs:Expr> <left_op:@L> "%" <right_op:@R> <rhs:Expr> <right:@R> => Expr {
+        span: Span::new(left, right),
+        kind: ExprKind::BinaryExpr {
+            op: BinaryOp {
+                kind: BinaryOpKind::Modulo,
+                span: Span::new(left_op, right_op)
+            },
+            lhs: Box::new(lhs),
+            rhs: Box::new(rhs)
+        }
+    },
+    #[precedence(level="4")] #[assoc(side="left")]
+    <left:@L> <lhs:Expr> <left_op:@L> "+" <right_op:@R> <rhs:Expr> <right:@R> => Expr {
+        span: Span::new(left, right),
+        kind: ExprKind::BinaryExpr {
+            op: BinaryOp {
+                kind: BinaryOpKind::Add,
+                span: Span::new(left_op, right_op)
+            },
+            lhs: Box::new(lhs),
+            rhs: Box::new(rhs)
+        }
+    },
+    <left:@L> <lhs:Expr> <left_op:@L> "-" <right_op:@R> <rhs:Expr> <right:@R> => Expr {
+        span: Span::new(left, right),
+        kind: ExprKind::BinaryExpr {
+            op: BinaryOp {
+                kind: BinaryOpKind::Subtract,
+                span: Span::new(left_op, right_op)
+            },
+            lhs: Box::new(lhs),
+            rhs: Box::new(rhs)
+        }
+    },
+    #[precedence(level="5")] #[assoc(side="left")]
+    <left:@L> <lhs:Expr> <left_op:@L> "<=" <right_op:@R> <rhs:Expr> <right:@R> => Expr {
+        span: Span::new(left, right),
+        kind: ExprKind::BinaryExpr {
+            op: BinaryOp {
+                kind: BinaryOpKind::LessThanOrEqual,
+                span: Span::new(left_op, right_op)
+            },
+            lhs: Box::new(lhs),
+            rhs: Box::new(rhs)
+        }
+    },
+    <left:@L> <lhs:Expr> <left_op:@L> ">=" <right_op:@R> <rhs:Expr> <right:@R> => Expr {
+        span: Span::new(left, right),
+        kind: ExprKind::BinaryExpr {
+            op: BinaryOp {
+                kind: BinaryOpKind::GreaterThanOrEqual,
+                span: Span::new(left_op, right_op)
+            },
+            lhs: Box::new(lhs),
+            rhs: Box::new(rhs)
+        }
+    },
+    <left:@L> <lhs:Expr> <left_op:@L> "<" <right_op:@R> <rhs:Expr> <right:@R> => Expr {
+        span: Span::new(left, right),
+        kind: ExprKind::BinaryExpr {
+            op: BinaryOp {
+                kind: BinaryOpKind::LessThan,
+                span: Span::new(left_op, right_op)
+            },
+            lhs: Box::new(lhs),
+            rhs: Box::new(rhs)
+        }
+    },
+    <left:@L> <lhs:Expr> <left_op:@L> ">" <right_op:@R> <rhs:Expr> <right:@R> => Expr {
+        span: Span::new(left, right),
+        kind: ExprKind::BinaryExpr {
+            op: BinaryOp {
+                kind: BinaryOpKind::GreaterThan,
+                span: Span::new(left_op, right_op)
+            },
+            lhs: Box::new(lhs),
+            rhs: Box::new(rhs)
+        }
+    },
+    #[precedence(level="6")] #[assoc(side="left")]
+    <left:@L> <lhs:Expr> <left_op:@L> "==" <right_op:@R> <rhs:Expr> <right:@R> => Expr {
+        span: Span::new(left, right),
+        kind: ExprKind::BinaryExpr {
+            op: BinaryOp {
+                kind: BinaryOpKind::Equal,
+                span: Span::new(left_op, right_op)
+            },
+            lhs: Box::new(lhs),
+            rhs: Box::new(rhs)
+        }
+    },
+    <left:@L> <lhs:Expr> <left_op:@L> "!=" <right_op:@R> <rhs:Expr> <right:@R> => Expr {
+        span: Span::new(left, right),
+        kind: ExprKind::BinaryExpr {
+            op: BinaryOp {
+                kind: BinaryOpKind::NotEqual,
+                span: Span::new(left_op, right_op)
+            },
+            lhs: Box::new(lhs),
+            rhs: Box::new(rhs)
+        }
+    },
+    #[precedence(level="7")] #[assoc(side="left")]
+    <left:@L> <lhs:Expr> <left_op:@L> "&&" <right_op:@R> <rhs:Expr> <right:@R> => Expr {
+        span: Span::new(left, right),
+        kind: ExprKind::BinaryExpr {
+            op: BinaryOp {
+                kind: BinaryOpKind::LogicalAnd,
+                span: Span::new(left_op, right_op)
+            },
+            lhs: Box::new(lhs),
+            rhs: Box::new(rhs)
+        }
+    },
+    #[precedence(level="8")] #[assoc(side="left")]
+    <left:@L> <lhs:Expr> <left_op:@L> "||" <right_op:@R> <rhs:Expr> <right:@R> => Expr {
+        span: Span::new(left, right),
+        kind: ExprKind::BinaryExpr {
+            op: BinaryOp {
+                kind: BinaryOpKind::LogicalOr,
+                span: Span::new(left_op, right_op)
+            },
+            lhs: Box::new(lhs),
+            rhs: Box::new(rhs)
+        }
+    },
+    #[precedence(level="9")] #[assoc(side="right")]
+    <left:@L> <lhs:Expr> <left_op:@L> "::" <right_op:@R> <rhs:Expr> <right:@R> => Expr {
+        span: Span::new(left, right),
+        kind: ExprKind::BinaryExpr {
+            op: BinaryOp {
+                kind: BinaryOpKind::Cons,
+                span: Span::new(left_op, right_op)
+            },
+            lhs: Box::new(lhs),
+            rhs: Box::new(rhs)
+        }
+    },
+    // lambda expression
+    #[precedence(level="10")] #[assoc(side="right")]
+    <left:@L> <args:Comma1<LambdaArg>> "->" <body:Expr> <right:@R> => Expr {
+        span: Span::new(left, right),
+        kind: ExprKind::Lambda {
+            args,
+            ret_ty,
+            body: Box::new(body)
+        }
+    }
+}
+
+
+ExprAtom: Expr = {
+    // literal
+    <ExprLiteral> => <>,
+    // variable
+    <left:@L> <name:ExprIdent> <right:@R> => Expr {
+        span: Span::new(left, right),
+        kind: ExprKind::Var(name)
+    },
+    // if expression
+    <left:@L> "if" <condition:Expr> "then" "{" <body:Expr> "}" "else" "{" <otherwise:Expr?> "}" <right:@R> => Expr {
+        span: Span::new(left, right),
+        kind: ExprKind::Conditional {
+            condition: Box::new(condition),
+            body: Box::new(body),
+            otherwise: otherwise.map(Box::new)
+        }
+    },
+    // match expression
+    <left:@L> "match" <value:Expr> "{" <arms:Comma0<MatchArm>> "}" <right:@R> => Expr {
+        span: Span::new(left, right),
+        kind: ExprKind::Match {
+            value: Box::new(value),
+            arms,
+        }
+    },
+}
+
+ExprLiteral: Expr = {
+    <left:@L> "lit_natural" <right:@R> => Expr {
+        span: Span::new(left, right),
+        kind: ExprKind::Literal(LiteralKind::Natural)
+    },
+    <left:@L> "lit_integer" <right:@R> => Expr {
+        span: Span::new(left, right),
+        kind: ExprKind::Literal(LiteralKind::Integer)
+    },
+    <left:@L> "lit_bool" <right:@R> => Expr {
+        span: Span::new(left, right),
+        kind: ExprKind::Literal(LiteralKind::Bool)
+    },
+    <left:@L> "lit_string" <right:@R> => Expr {
+        span: Span::new(left, right),
+        kind: ExprKind::Literal(LiteralKind::String)
+    },
+    <ExprLiteralUnit> => <>,
+    // tuple expression
+    <left:@L> "(" <elements:Comma2<Expr>> ")" <right:@R> => Expr {
+        span: Span::new(left, right),
+        kind: ExprKind::Tuple(elements)
+    },
+    // list expression
+    <left:@L> "[" <elements:Comma0<Expr>> "]" <right:@R> => Expr {
+        span: Span::new(left, right),
+        kind: ExprKind::List(elements)
+    },
+    // record expression
+    <left:@L> "{" <fields:Comma0<ExprLiteralRecordField>> "}" <right:@R> => Expr {
+        span: Span::new(left, right),
+        kind: ExprKind::Record {
+            fields: indexmap::IndexMap::from_iter(fields)
+        }
+    }
+}
+
+ExprLiteralUnit: Expr = {
+    <left:@L> "()" <right:@R> => Expr {
+        span: Span::new(left, right),
+        kind: ExprKind::Literal(LiteralKind::Unit)
+    }
+}
+
+ExprLiteralRecordField: (ExprIdent, Expr) = {
+    <name:ExprIdent> ":" <expr:Expr> => (name, expr)
+}
+
+MatchArm: MatchArm = {
+    <left:@L> <pattern:Pattern> "->" <expr:Expr> <right:@R> => MatchArm {
+        span: Span::new(left, right),
+        pattern,
+        expr
+    }
+}
+
+Pattern: Pattern = {
+    // literal patterns
+    #[precedence(level="0")]
+    <PatternAtom> => <>,
+    "(" <Pattern> ")" => <>,
+    // list pattern
+    #[precedence(level="1")] #[assoc(side="right")]
+    <left:@L> <lhs:Pattern> "::" <rhs:Pattern> <right:@R> => Pattern {
+        span: Span::new(left, right),
+        kind: PatternKind::Cons(Box::new(lhs), Box::new(rhs))
+    },
+    // or-pattern
+    #[precedence(level="2")] #[assoc(side="left")]
+    <left:@L> <lhs:Pattern> "|" <rhs:Pattern> <right:@R> => Pattern {
+        span: Span::new(left, right),
+        kind: PatternKind::Or {
+            lhs: Box::new(lhs),
+            rhs: Box::new(rhs)
+        }
+    }
+}
+
+PatternAtom: Pattern = {
+    <PatternLiteral> => <>,
+    // variable pattern
+    <left:@L> <name:PatternIdent> <right:@R> => Pattern {
+        span: Span::new(left, right),
+        kind: PatternKind::Var(name)
+    },
+    // wildcard pattern
+    <left:@L> "_" <right:@R> => Pattern {
+        span: Span::new(left, right),
+        kind: PatternKind::Wildcard
+    },
+    // tuple pattern
+    <left:@L> "(" <patterns:Comma0<Pattern>> ")" <right:@R> => Pattern {
+        span: Span::new(left, right),
+        kind: PatternKind::Tuple(patterns)
+    },
+    // record pattern
+    <left:@L> "{" <fields:Comma0<PatternRecordField>> "}" <right:@R> => Pattern {
+        span: Span::new(left, right),
+        kind: PatternKind::Record(indexmap::IndexMap::from_iter(fields))
+    }
+}
+
+PatternLiteral: Pattern = {
+     <left:@L> "lit_natural" <right:@R> => Pattern {
+        span: Span::new(left, right),
+        kind: PatternKind::Literal(LiteralKind::Natural)
+    },
+    <left:@L> "lit_integer" <right:@R> => Pattern {
+        span: Span::new(left, right),
+        kind: PatternKind::Literal(LiteralKind::Integer)
+    },
+    <left:@L> "lit_bool" <right:@R> => Pattern {
+        span: Span::new(left, right),
+        kind: PatternKind::Literal(LiteralKind::Bool)
+    },
+    <left:@L> "lit_string" <right:@R> => Pattern {
+        span: Span::new(left, right),
+        kind: PatternKind::Literal(LiteralKind::String)
+    },
+    <PatternLiteralUnit> => <>
+}
+
+PatternLiteralUnit: Pattern = {
+    <left:@L> "()" <right:@R> => Pattern {
+        span: Span::new(left, right),
+        kind: PatternKind::Literal(LiteralKind::Unit)
+    }
+}
+
+PatternRecordField: (Ident, Pattern) = {
+    <name:PatternIdent> ":" <pattern:Pattern> => (name, pattern)
+}
+
+LambdaArg: LambdaArg = {
+    <left:@L> <pattern:Pattern> <ty:(":" Type)?> <right:@R> => LambdaArg {
+        pattern,
+        ty
+    }
+}

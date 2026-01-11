@@ -1,0 +1,17 @@
+[package]
+name = "kali-lalrpop"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+indexmap = "2.12.1"
+lalrpop-util = "0.22.2"
+lasso = "0.7.3"
+logos = "0.16.0"
+strum = { version = "0.27.2", features = ["derive"] }
+
+[build-dependencies]
+lalrpop = "0.22.2"
+
+[dev-dependencies]
+assert_matches = "1.5.0"

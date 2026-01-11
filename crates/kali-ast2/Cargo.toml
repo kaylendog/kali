@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-chumsky = "0.11.2"
+chumsky = "0.12.0"
 indexmap = "2.11.4"
 lasso = "0.7.3"
 strum = { version = "0.27.2", features = ["derive"] }

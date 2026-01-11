@@ -1,0 +1,11 @@
+[package]
+name = "kali-parse3"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+chumsky = { version = "0.12", features = ["pratt"] }
+indexmap = "2.12.1"
+lasso = "0.7"
+logos = "0.16.0"
+strum = { version = "0.27.2", features = ["derive"] }
