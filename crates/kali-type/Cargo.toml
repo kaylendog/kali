@@ -4,10 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-strum = { version = "0.26", features = ["derive"] }
-strum_macros = "0.26"
-thiserror = "1"
-tracing = "0.1"
-
-kali-ast = { path = "../kali-ast" }
-kali-parse = { path = "../kali-parse" }
+strum = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }

@@ -56,22 +56,9 @@ fn main() {
 
     match args.command {
         Command::Debug { kind } => match kind {
-            DebugKind::Lex { file } => {
-                let contents = std::fs::read_to_string(&file).expect("could not read file");
-                let tokens = kali_parse::lexer::lex_to_vec(&contents);
-                println!("{:?}", tokens);
-            }
-            DebugKind::Parse { file } => {
-                let contents = std::fs::read_to_string(&file).expect("could not read file");
-                let module = kali_parse::parse_str(&contents).expect("could not parse file");
-                println!("{:#?}", module);
-            }
-            DebugKind::Typecheck { file } => {
-                let contents = std::fs::read_to_string(&file).expect("could not read file");
-                let module = kali_parse::parse_str(&contents).expect("could not parse file");
-                let module = TypeInferenceEngine::infer(module);
-                println!("{:#?}", module);
-            }
+            DebugKind::Lex { file } => {}
+            DebugKind::Parse { file } => {}
+            DebugKind::Typecheck { file } => {}
         },
     }
 }

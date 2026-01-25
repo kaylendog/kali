@@ -4,18 +4,16 @@ use chumsky::{
     pratt::{Associativity, infix, left, postfix, prefix, right},
     prelude::*,
 };
+use kali_ast::{
+    BinaryOp, BinaryOpKind, Definition, Destructor, DestructorKind, Expr, ExprKind, Ident,
+    ImportTree, ImportTreeKind, Item, ItemKind, LambdaParam, LiteralKind, MatchArm, Module,
+    Pattern, PatternKind, PrimitiveTypeKind, Type, TypeAlias, TypeKind, UnaryOp, UnaryOpKind,
+    Visibility,
+};
 use logos::Logos;
 
-use crate::{
-    ast::{
-        BinaryOp, BinaryOpKind, Destructor, DestructorKind, Expr, ExprKind, Ident, ImportTree,
-        ImportTreeKind, Item, ItemKind, LambdaParam, LiteralKind, MatchArm, Module, Pattern,
-        PatternKind, PrimitiveTypeKind, Type, TypeKind, UnaryOp, UnaryOpKind, Visibility,
-    },
-    lexer::Token,
-};
+use crate::lexer::Token;
 
-mod ast;
 mod lexer;
 
 /// Represents the state used during parsing, including a string interner for efficient string handling.
@@ -67,13 +65,15 @@ where
     I: ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>,
 {
     // ident ::= Ident
-    let ident = select! { Token::Ident(ident) => ident }.map_with(|ident, e| {
-        let state: &mut SimpleState<State> = e.state();
-        Ident {
-            key: state.rodeo.get_or_intern(ident),
-            span: e.span(),
-        }
-    });
+    let ident = select! { Token::Ident(ident) => ident }
+        .map_with(|ident, e| {
+            let state: &mut SimpleState<State> = e.state();
+            Ident {
+                key: state.rodeo.get_or_intern(ident),
+                span: e.span(),
+            }
+        })
+        .labelled("identifier");
 
     // literal_kind ::= LitBool | LitInteger | LitNatural | LitUnit | LitString
     let literal_kind = choice((
@@ -84,14 +84,16 @@ where
             // TODO: Floats
             // Token::LitFloat(value) => LiteralKind::Float(value),
             Token::LitUnit => LiteralKind::Unit,
-        },
+        }
+        .labelled("literal"),
         select! {
             Token::LitString(value) => value
         }
         .map_with(|value, e| {
             let state: &mut SimpleState<State> = e.state();
             LiteralKind::String(state.rodeo.get_or_intern(value))
-        }),
+        })
+        .labelled("string literal"),
     ));
 
     // ty ::= primitive | named | tuple | list | record | (ty)
@@ -105,10 +107,11 @@ where
             Token::TypeString => PrimitiveTypeKind::String,
             Token::LitUnit => PrimitiveTypeKind::Unit
         }
-        .map(TypeKind::Primitive);
+        .map(TypeKind::Primitive)
+        .labelled("primitive type");
 
         // named ::= ident
-        let named = ident.clone().map(TypeKind::Named);
+        let named = ident.clone().map(TypeKind::Named).labelled("named type");
 
         // tuple ::= (ty (, ty)*)
         let tuple = ty
@@ -117,13 +120,15 @@ where
             .at_least(1)
             .collect::<Vec<_>>()
             .delimited_by(just(Token::SymLParen), just(Token::SymRParen))
-            .map(TypeKind::Tuple);
+            .map(TypeKind::Tuple)
+            .labelled("tuple type");
 
         // list ::= [ty]
         let list = ty
             .clone()
             .delimited_by(just(Token::SymLBracket), just(Token::SymRBracket))
-            .map(|ty| TypeKind::List(Box::new(ty)));
+            .map(|ty| TypeKind::List(Box::new(ty)))
+            .labelled("list type");
 
         // record ::= { ident : ty (, ident : ty)* }
         let record = ident
@@ -134,7 +139,8 @@ where
             .allow_trailing()
             .collect::<Vec<_>>()
             .delimited_by(just(Token::SymLBrace), just(Token::SymRBrace))
-            .map(|entries| TypeKind::Record(indexmap::IndexMap::from_iter(entries)));
+            .map(|entries| TypeKind::Record(indexmap::IndexMap::from_iter(entries)))
+            .labelled("record type");
 
         let atom = choice((primitive, named, tuple, list, record))
             .map_with(|kind, e| Type {
@@ -162,18 +168,27 @@ where
                 span: e.span(),
             }),
         ))
-    });
+    })
+    .labelled("type");
 
     // pattern ::= literal | variable | wildcard | tuple | record | empty_list | (pattern)
     let pattern = recursive(|pattern| {
         // literal ::= literal_kind
-        let atom_literal = literal_kind.clone().map(PatternKind::Literal);
+        let atom_literal = literal_kind
+            .clone()
+            .map(PatternKind::Literal)
+            .labelled("literal pattern");
 
         // variable ::= ident
-        let atom_variable = ident.clone().map(PatternKind::Var);
+        let atom_variable = ident
+            .clone()
+            .map(PatternKind::Var)
+            .labelled("variable pattern");
 
         // wildcard ::= _
-        let atom_wildcard = just(Token::SymWildcard).to(PatternKind::Wildcard);
+        let atom_wildcard = just(Token::SymWildcard)
+            .to(PatternKind::Wildcard)
+            .labelled("wildcard pattern");
 
         // tuple ::= (pattern (, pattern)*)
         let atom_tuple = pattern
@@ -183,7 +198,8 @@ where
             .allow_trailing()
             .collect::<Vec<_>>()
             .delimited_by(just(Token::SymLParen), just(Token::SymRParen))
-            .map(PatternKind::Tuple);
+            .map(PatternKind::Tuple)
+            .labelled("tuple pattern");
 
         // record ::= { ident : pattern (, ident : pattern)* }
         let atom_record = ident
@@ -194,10 +210,13 @@ where
             .allow_trailing()
             .collect::<Vec<_>>()
             .delimited_by(just(Token::SymLBrace), just(Token::SymRBrace))
-            .map(|entries| PatternKind::Record(indexmap::IndexMap::from_iter(entries)));
+            .map(|entries| PatternKind::Record(indexmap::IndexMap::from_iter(entries)))
+            .labelled("record pattern");
 
         // empty_list ::= []
-        let atom_empty_list = just(Token::SymArray).to(PatternKind::EmptyList);
+        let atom_empty_list = just(Token::SymArray)
+            .to(PatternKind::EmptyList)
+            .labelled("empty list pattern");
 
         let atom = choice((
             atom_literal,
@@ -211,7 +230,8 @@ where
             kind,
             span: e.span(),
         })
-        .or(pattern.delimited_by(just(Token::SymLParen), just(Token::SymRParen)));
+        .or(pattern.delimited_by(just(Token::SymLParen), just(Token::SymRParen)))
+        .labelled("pattern");
 
         // pattern ::= pattern :: pattern | pattern | pattern
         atom.pratt((
@@ -238,12 +258,16 @@ where
                 },
             ),
         ))
-    });
+    })
+    .labelled("pattern");
 
     // destructor ::= variable | tuple | record | (destructor)
     let destructor = recursive(|destructor| {
         // variable ::= ident
-        let atom_variable = ident.clone().map(DestructorKind::Var);
+        let atom_variable = ident
+            .clone()
+            .map(DestructorKind::Var)
+            .labelled("variable destructor");
 
         // tuple ::= (destructor (, destructor)*)
         let atom_tuple = destructor
@@ -253,7 +277,8 @@ where
             .allow_trailing()
             .collect::<Vec<_>>()
             .delimited_by(just(Token::SymLParen), just(Token::SymRParen))
-            .map(DestructorKind::Tuple);
+            .map(DestructorKind::Tuple)
+            .labelled("tuple destructor");
 
         // record ::= { ident : destructor (, ident : destructor)* }
         let atom_record = ident
@@ -264,7 +289,8 @@ where
             .allow_trailing()
             .collect::<Vec<_>>()
             .delimited_by(just(Token::SymLBrace), just(Token::SymRBrace))
-            .map(|entries| DestructorKind::Record(indexmap::IndexMap::from_iter(entries)));
+            .map(|entries| DestructorKind::Record(indexmap::IndexMap::from_iter(entries)))
+            .labelled("record destructor");
 
         choice((atom_variable, atom_tuple, atom_record))
             .map_with(|kind, e| Destructor {
@@ -272,15 +298,22 @@ where
                 span: e.span(),
             })
             .or(destructor.delimited_by(just(Token::SymLParen), just(Token::SymRParen)))
-    });
+    })
+    .labelled("destructor");
 
     // expr ::= literal | variable | tuple | list | if_expr | match_expr | (expr)
     let expr = recursive(|expr| {
         // literal ::= literal_kind
-        let atom_literal = literal_kind.clone().map(ExprKind::Literal);
+        let atom_literal = literal_kind
+            .clone()
+            .map(ExprKind::Literal)
+            .labelled("literal expression");
 
         // variable ::= ident
-        let atom_variable = ident.clone().map(ExprKind::Var);
+        let atom_variable = ident
+            .clone()
+            .map(ExprKind::Var)
+            .labelled("variable expression");
 
         // tuple ::= (expr (, expr)*)
         let atom_tuple = expr
@@ -289,7 +322,8 @@ where
             .at_least(2)
             .collect::<Vec<_>>()
             .delimited_by(just(Token::SymLParen), just(Token::SymRParen))
-            .map(ExprKind::Tuple);
+            .map(ExprKind::Tuple)
+            .labelled("tuple expression");
 
         // list ::= [expr (, expr)*] | []
         let atom_list = expr
@@ -298,7 +332,8 @@ where
             .collect::<Vec<_>>()
             .delimited_by(just(Token::SymLBracket), just(Token::SymRBracket))
             .or(just(Token::SymArray).to(vec![]))
-            .map(ExprKind::List);
+            .map(ExprKind::List)
+            .labelled("list expression");
 
         // if_expr ::= if expr { expr } else { expr }
         let atom_if = just(Token::KeywordIf)
@@ -319,7 +354,8 @@ where
                 condition: Box::new(condition),
                 body: Box::new(body),
                 otherwise: otherwise.map(|otherwise| Box::new(otherwise)),
-            });
+            })
+            .labelled("if expression");
 
         // match_expr ::= match expr { pattern -> expr (, pattern -> expr)* }
         let atom_match = just(Token::KeywordMatch)
@@ -342,7 +378,8 @@ where
             .map(|(value, arms)| ExprKind::Match {
                 value: Box::new(value),
                 arms,
-            });
+            })
+            .labelled("match expression");
 
         let atom = choice((
             atom_literal,
@@ -483,14 +520,16 @@ where
                 binary_expr,
             ),
         ))
-    });
+    })
+    .labelled("expression");
 
     // item_type_alias ::= type ident = ty
     let item_type_alias = just(Token::KeywordType)
         .ignore_then(ident.clone())
         .then_ignore(just(Token::OpAssign))
         .then(ty.clone())
-        .map(|(name, ty)| ItemKind::TypeAlias { name, ty });
+        .map(|(name, ty)| ItemKind::TypeAlias(TypeAlias { name, ty }))
+        .labelled("type alias");
 
     // item_import_tree ::= import import_tree
     let item_import_tree = just(Token::KeywordImport)
@@ -499,7 +538,8 @@ where
             let item = ident
                 .clone()
                 .then(just(Token::KeywordAs).ignore_then(ident.clone()).or_not())
-                .map(|(name, alias)| ImportTreeKind::Item { name, alias });
+                .map(|(name, alias)| ImportTreeKind::Item { name, alias })
+                .labelled("import item");
 
             // segment ::= ident :: import_tree
             let segment = ident
@@ -509,10 +549,13 @@ where
                 .map(|(name, child)| ImportTreeKind::Segment {
                     name,
                     child: Box::new(child),
-                });
+                })
+                .labelled("import segment");
 
             // glob ::= *
-            let glob = just(Token::OpMultiply).to(ImportTreeKind::Glob);
+            let glob = just(Token::OpMultiply)
+                .to(ImportTreeKind::Glob)
+                .labelled("import glob");
 
             // list ::= { import_tree (, import_tree)* }
             let list = import_tree
@@ -521,33 +564,38 @@ where
                 .allow_trailing()
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::SymLBrace), just(Token::SymRBrace))
-                .map(ImportTreeKind::List);
+                .map(ImportTreeKind::List)
+                .labelled("import list");
 
             choice((item, segment, glob, list)).map_with(|kind, e| ImportTree {
                 kind,
                 span: e.span(),
             })
         }))
-        .map(ItemKind::Import);
+        .map(ItemKind::Import)
+        .labelled("import tree");
 
     // item_definition ::= let destructor = expr
     let item_definition = just(Token::KeywordLet)
         .ignore_then(destructor.clone())
         .then_ignore(just(Token::OpAssign))
         .then(expr.clone())
-        .map(|(name, expr)| ItemKind::Definition { name, expr });
+        .map(|(name, expr)| ItemKind::Definition(Definition { name, expr }))
+        .labelled("definition");
 
     // item ::= item_type_alias | item_import_tree | item_definition
-    let item =
-        choice((item_type_alias, item_import_tree, item_definition)).map_with(|kind, e| Item {
+    let item = choice((item_type_alias, item_import_tree, item_definition))
+        .map_with(|kind, e| Item {
             visibility: Visibility::Inherited,
             kind,
             span: e.span(),
-        });
+        })
+        .labelled("item");
 
-    // parser ::= item (; item)*
+    // module ::= item (; item)*
     item.separated_by(just(Token::SymSemicolon))
         .collect::<Vec<_>>()
+        .labelled("module")
 }
 
 /// Parses the given source code into a `Module` representation.
@@ -622,10 +670,4 @@ macro_rules! kali {
         let input = stringify!($($tts)*);
         $crate::parse_str(input).unwrap()
     }};
-}
-
-fn test() {
-    kali! {
-        let x = 1
-    };
 }

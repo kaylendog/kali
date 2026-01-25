@@ -1,7 +1,9 @@
 [workspace]
 resolver = "2"
-members = ["./crates/*", "crates/kali-ast3", "crates/kali-lalrpop", "crates/kali-parse3"]
+members = ["./crates/*", "crates/kali-ast"]
 
 [workspace.dependencies]
+strum = { version = "0.24", features = ["derive"] }
+thiserror = "1.0"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }

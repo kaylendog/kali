@@ -9,3 +9,5 @@ indexmap = "2.12.1"
 lasso = "0.7"
 logos = "0.16.0"
 strum = { version = "0.27.2", features = ["derive"] }
+
+kali-ast = { path = "../kali-ast" }
