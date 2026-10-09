@@ -467,7 +467,7 @@ let a = -f x + g y * 2 ** 3
 let b = x :: rest == l && !done || p < q
 ```
 
-In patterns, `|` binds tighter than `::`: `a :: b | c` is `a :: (b | c)`.
+In patterns, `::` binds tighter than `|`, as in OCaml and Rust: `a :: b | c` is `(a :: b) | c`.
 
 #status[`&`, `|`, `^`, `<<`, `>>` and `@` are lexed but not parsed as expression operators.]
 

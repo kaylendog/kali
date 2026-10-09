@@ -170,8 +170,9 @@ fn expr_precedence(expr: &Expr) -> u8 {
 
 fn pattern_precedence(pattern: &Pattern) -> (u8, Assoc) {
     match &pattern.kind {
-        PatternKind::Cons { .. } => (1, Assoc::Right),
-        PatternKind::Or { .. } => (2, Assoc::Left),
+        // `|` is loosest, as in OCaml and Rust: `a :: b | c` is `(a :: b) | c`.
+        PatternKind::Cons { .. } => (2, Assoc::Right),
+        PatternKind::Or { .. } => (1, Assoc::Left),
         _ => (ATOM, Assoc::Left),
     }
 }

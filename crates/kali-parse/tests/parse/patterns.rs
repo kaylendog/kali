@@ -47,11 +47,11 @@ fn cons_is_right_associative() {
 }
 
 #[test]
-fn or_binds_tighter_than_cons() {
+fn cons_binds_tighter_than_or() {
     assert_eq!(pattern_sexp("1 | 2 | 3"), "(| (| 1 2) 3)");
-    assert_eq!(pattern_sexp("a :: b | c"), "(:: a (| b c))");
-    assert_eq!(pattern_sexp("a | b :: c"), "(:: (| a b) c)");
-    assert_eq!(pattern_sexp("(a :: b) | c"), "(| (:: a b) c)");
+    assert_eq!(pattern_sexp("a :: b | c"), "(| (:: a b) c)");
+    assert_eq!(pattern_sexp("a | b :: c"), "(| a (:: b c))");
+    assert_eq!(pattern_sexp("a :: (b | c)"), "(:: a (| b c))");
     rejects_pattern("a |");
 }
 

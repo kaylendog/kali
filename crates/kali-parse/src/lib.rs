@@ -285,7 +285,7 @@ where
         // pattern ::= pattern :: pattern | pattern | pattern
         atom.pratt((
             infix(
-                Associativity::Right(1),
+                Associativity::Right(2),
                 just(Token::OpCons),
                 |lhs, _, rhs, e| {
                     let state: &mut SimpleState<State> = e.state();
@@ -300,7 +300,8 @@ where
                 },
             ),
             infix(
-                Associativity::Left(2),
+                // `|` is loosest, as in OCaml and Rust: `a :: b | c` is `(a :: b) | c`.
+                Associativity::Left(1),
                 just(Token::OpBitwiseOr),
                 |lhs, _, rhs, e| {
                     let state: &mut SimpleState<State> = e.state();

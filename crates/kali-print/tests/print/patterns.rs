@@ -48,9 +48,9 @@ fn redundant_parentheses_are_dropped() {
 }
 
 #[test]
-fn or_binds_tighter_than_cons() {
+fn cons_binds_tighter_than_or() {
     assert_round_trip(
         "let x = match l { | (a | b) :: c -> 0 | a :: (b | c) -> 1 | (a :: b) | c -> 2 }",
-        &arms("\t| a | b :: c -> 0\n\t| a :: b | c -> 1\n\t| (a :: b) | c -> 2\n"),
+        &arms("\t| (a | b) :: c -> 0\n\t| a :: (b | c) -> 1\n\t| a :: b | c -> 2\n"),
     );
 }
