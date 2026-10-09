@@ -330,7 +330,6 @@ impl Print for Type {
             TypeKind::Primitive(primitive) => {
                 let name = match primitive {
                     PrimitiveTypeKind::Integer => "int",
-                    PrimitiveTypeKind::Natural => "nat",
                     PrimitiveTypeKind::Float => "float",
                     PrimitiveTypeKind::Bool => "bool",
                     PrimitiveTypeKind::String => "string",
@@ -378,7 +377,6 @@ impl Print for Type {
 impl Print for LiteralKind {
     fn print(&self, ctx: &mut Context) -> Result<()> {
         match self {
-            LiteralKind::Natural(value) => write!(ctx, "{value}")?,
             LiteralKind::Integer(value) => write!(ctx, "{value}")?,
             // Debug keeps the decimal point so the literal lexes as a float again.
             LiteralKind::Float(value) => write!(ctx, "{value:?}")?,

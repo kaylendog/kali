@@ -116,17 +116,16 @@ Kali has the following primitive data types. Type names are lowercase.
 #table(
   columns: 3,
   [*Type*], [*Name*], [*Literals*],
-  [Natural], `nat`, `0`,
-  [Integer], `int`, `-5`,
+  [Integer], `int`, `5`,
   [Float], `float`, `10.5`,
   [Boolean], `bool`, `true`,
   [String], `string`, `"Hello"`,
   [Unit], `()`, `()`,
 )
 
-==== Naturals and Integers
+==== Integers
 
-A number literal without a sign is a natural. A `-` immediately followed by digits is an integer literal, so `n - 1` must be written with spaces to mean subtraction. Literals may use `_` as a separator and the prefixes `0x`, `0o`, `0b` and `0d`.
+Integer literals are signed 64-bit. They may use `_` as a separator and the prefixes `0x`, `0o`, `0b` and `0d`. A negative number is the negation operator applied to a literal, so `-5` and `n-1` both mean what they look like.
 
 ```kali
 let x = 10

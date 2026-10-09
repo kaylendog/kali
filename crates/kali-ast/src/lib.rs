@@ -186,8 +186,6 @@ pub enum TypeKind {
 pub enum PrimitiveTypeKind {
     /// Integer type.
     Integer,
-    /// Natural number type.
-    Natural,
     /// Floating-point type.
     Float,
     /// Boolean type.
@@ -282,8 +280,6 @@ pub enum ExprKind {
 #[derive(Debug, Clone)]
 /// Represents the kind of literal in the source code.
 pub enum LiteralKind {
-    /// A natural number literal (e.g., `42`).
-    Natural(u64),
     /// An integer literal (e.g., `-7`).
     Integer(i64),
     /// A floating-point literal (e.g., `3.14`).

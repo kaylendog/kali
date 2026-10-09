@@ -97,7 +97,6 @@ where
         select! {
             Token::LitBool(value) => LiteralKind::Bool(value),
             Token::LitInteger(value) => LiteralKind::Integer(value),
-            Token::LitNatural(value) => LiteralKind::Natural(value),
             // TODO: Floats
             // Token::LitFloat(value) => LiteralKind::Float(value),
             Token::LitUnit => LiteralKind::Unit,
@@ -120,7 +119,6 @@ where
             Token::TypeBool => PrimitiveTypeKind::Bool,
             Token::TypeFloat => PrimitiveTypeKind::Float,
             Token::TypeInteger => PrimitiveTypeKind::Integer,
-            Token::TypeNatural => PrimitiveTypeKind::Natural,
             Token::TypeString => PrimitiveTypeKind::String,
             Token::LitUnit => PrimitiveTypeKind::Unit
         }
@@ -696,13 +694,11 @@ fn ends_item(token: &Token) -> bool {
     matches!(
         token,
         Token::Ident(_)
-            | Token::LitNatural(_)
             | Token::LitInteger(_)
             | Token::LitBool(_)
             | Token::LitUnit
             | Token::LitString(_)
             | Token::TypeInteger
-            | Token::TypeNatural
             | Token::TypeFloat
             | Token::TypeBool
             | Token::TypeString

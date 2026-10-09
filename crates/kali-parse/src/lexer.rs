@@ -48,9 +48,6 @@ pub enum Token<'src> {
     #[token("int")]
     #[strum(to_string = "int")]
     TypeInteger,
-    #[token("nat")]
-    #[strum(to_string = "nat")]
-    TypeNatural,
     #[token("float")]
     #[strum(to_string = "float")]
     TypeFloat,
@@ -139,18 +136,11 @@ pub enum Token<'src> {
     Ident(&'src str),
 
     // literals
-    #[regex("[0-9][0-9_]*", |lex| lex.slice().replace('_', "").parse().ok(), priority = 1)]
-    #[regex("0x[0-9a-fA-F][0-9a-fA-F_]*", |lex| prefixed_natural(lex))]
-    #[regex("0b[01][01_]*", |lex| prefixed_natural(lex))]
-    #[regex("0o[0-7][0-7_]*", |lex| prefixed_natural(lex))]
-    #[regex("0d[0-9][0-9_]*", |lex| prefixed_natural(lex))]
-    #[strum(to_string = "natural literal")]
-    LitNatural(u64),
-    #[regex("-[0-9][0-9_]*", |lex| lex.slice().replace('_', "").parse().ok())]
-    #[regex("-0x[0-9a-fA-F][0-9a-fA-F_]*", |lex| prefixed_integer(lex))]
-    #[regex("-0b[01][01_]*", |lex| prefixed_integer(lex))]
-    #[regex("-0o[0-7][0-7_]*", |lex| prefixed_integer(lex))]
-    #[regex("-0d[0-9][0-9_]*", |lex| prefixed_integer(lex))]
+    #[regex("[0-9][0-9_]*", |lex| lex.slice().replace('_', "").parse().ok())]
+    #[regex("0x[0-9a-fA-F][0-9a-fA-F_]*", |lex| prefixed_integer(lex))]
+    #[regex("0b[01][01_]*", |lex| prefixed_integer(lex))]
+    #[regex("0o[0-7][0-7_]*", |lex| prefixed_integer(lex))]
+    #[regex("0d[0-9][0-9_]*", |lex| prefixed_integer(lex))]
     #[strum(to_string = "integer literal")]
     LitInteger(i64),
     #[token("true", |_| true)]
@@ -232,7 +222,7 @@ pub enum LexicalError {
     InvalidToken,
 }
 
-fn prefixed_natural<'src>(lex: &mut logos::Lexer<'src, Token<'src>>) -> Option<u64> {
+fn prefixed_integer<'src>(lex: &mut logos::Lexer<'src, Token<'src>>) -> Option<i64> {
     let slice = lex.slice();
     let radix = match &slice[..2] {
         "0x" => 16,
@@ -241,26 +231,12 @@ fn prefixed_natural<'src>(lex: &mut logos::Lexer<'src, Token<'src>>) -> Option<u
         "0d" => 10,
         _ => unreachable!(),
     };
-    // remove underscore separators and parse
-    let slice = slice[2..].replace("_", "");
-    u64::from_str_radix(&slice, radix).ok()
-}
-
-fn prefixed_integer<'src>(lex: &mut logos::Lexer<'src, Token<'src>>) -> Option<i64> {
-    let slice = lex.slice();
-    let negative = slice.starts_with('-');
-    let radix = match &slice[1..3] {
-        "0x" => 16,
-        "0b" => 2,
-        "0o" => 8,
-        "0d" => 10,
-        _ => unreachable!(),
-    };
-    // remove underscore separators and parse
-    let slice = slice[3..].replace("_", "");
-    i64::from_str_radix(&slice, radix)
-        .ok()
-        .map(|n| if negative { -n } else { n })
+    i64::from_str_radix(
+        // remove underscores and base prefix
+        &slice[2..].replace('_', ""),
+        radix,
+    )
+    .ok()
 }
 
 fn comment<'src>(lex: &mut logos::Lexer<'src, Token<'src>>) -> Option<&'src str> {
@@ -294,9 +270,9 @@ mod tests {
             vec![
                 Token::Comment("Hello, world!"),
                 Token::DocComment("Hello, world!"),
-                Token::LitNatural(1234),
+                Token::LitInteger(1234),
                 Token::Comment("Hello, world!"),
-                Token::LitNatural(5678),
+                Token::LitInteger(5678),
                 Token::DocComment("Hello, world!")
             ],
             tokens
