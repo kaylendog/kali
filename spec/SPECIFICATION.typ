@@ -326,7 +326,7 @@ Both the `if` and `else` branches must return a value of the same type.
 
 You can chain multiple conditions using `else if`:
 
-```kali-planned
+```kali
 let sign = if x > 0 {
   "positive"
 } else if x < 0 {
@@ -338,7 +338,7 @@ let sign = if x > 0 {
 
 Because `if` is an expression, it can be used anywhere a value is expected, such as in variable bindings or function arguments.
 
-#status[The parser accepts `if` without `else`; rejecting it is the type checker's job. `else if` is not parsed yet and must be written `else { if .. }`.]
+#status[The parser accepts `if` without `else`; rejecting it is the type checker's job.]
 
 === Pattern Matching <pattern-matching>
 

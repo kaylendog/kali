@@ -112,7 +112,9 @@ fn conditionals() {
     parses("let x = if a { b } else { c }");
     parses("let x = if a { b }");
     parses("let x = if a { b } else { if c { d } else { e } }");
-    rejects("let x = if a { b } else if c { d } else { e }");
+    parses("let x = if a { b } else if c { d } else { e }");
+    parses("let x = if a { b } else if c { d }");
+    rejects("let x = if a { b } else c");
     rejects("let x = if a then b else c");
 }
 

@@ -537,13 +537,19 @@ impl Print for Expr {
                 ctx.newline()?;
                 write!(ctx, "}}")?;
                 if let Some(otherwise) = otherwise {
-                    write!(ctx, " else {{")?;
-                    ctx.increase();
-                    ctx.newline()?;
-                    otherwise.print(ctx)?;
-                    ctx.decrease();
-                    ctx.newline()?;
-                    write!(ctx, "}}")?;
+                    write!(ctx, " else ")?;
+                    // `else { if .. }` prints as `else if ..`, so chains stay flat.
+                    if matches!(otherwise.kind, ExprKind::Conditional { .. }) {
+                        otherwise.print(ctx)?;
+                    } else {
+                        write!(ctx, "{{")?;
+                        ctx.increase();
+                        ctx.newline()?;
+                        otherwise.print(ctx)?;
+                        ctx.decrease();
+                        ctx.newline()?;
+                        write!(ctx, "}}")?;
+                    }
                 }
                 Ok(())
             }

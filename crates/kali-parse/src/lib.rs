@@ -400,27 +400,35 @@ where
             .map(ExprKind::List)
             .labelled("list expression");
 
-        // if_expr ::= if expr { expr } else { expr }
-        let atom_if = just(Token::KeywordIf)
-            .ignore_then(expr.clone())
-            .then(
-                expr.clone()
-                    .delimited_by(just(Token::SymLBrace), just(Token::SymRBrace)),
-            )
-            .then(
-                just(Token::KeywordElse)
-                    .ignore_then(
-                        expr.clone()
-                            .delimited_by(just(Token::SymLBrace), just(Token::SymRBrace)),
-                    )
-                    .or_not(),
-            )
-            .map(|((condition, body), otherwise)| ExprKind::Conditional {
-                condition: Box::new(condition),
-                body: Box::new(body),
-                otherwise: otherwise.map(Box::new),
-            })
-            .labelled("if expression");
+        // if_expr ::= if expr { expr } (else ({ expr } | if_expr))?
+        // `else if ..` is `else { if .. }`: the nested `if` is the whole else branch.
+        let atom_if = recursive(|atom_if| {
+            let block = expr
+                .clone()
+                .delimited_by(just(Token::SymLBrace), just(Token::SymRBrace));
+            let else_if = atom_if.map_with(|kind, e| {
+                let state: &mut SimpleState<State> = e.state();
+                Expr {
+                    id: state.next_id(),
+                    kind,
+                    span: e.span(),
+                }
+            });
+            just(Token::KeywordIf)
+                .ignore_then(expr.clone())
+                .then(block.clone())
+                .then(
+                    just(Token::KeywordElse)
+                        .ignore_then(block.or(else_if))
+                        .or_not(),
+                )
+                .map(|((condition, body), otherwise)| ExprKind::Conditional {
+                    condition: Box::new(condition),
+                    body: Box::new(body),
+                    otherwise: otherwise.map(Box::new),
+                })
+        })
+        .labelled("if expression");
 
         // match_expr ::= match expr { (| pattern -> expr)+ }
         let atom_match = just(Token::KeywordMatch)
