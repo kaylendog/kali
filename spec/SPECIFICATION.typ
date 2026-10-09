@@ -383,7 +383,7 @@ The available patterns are:
   [*Pattern*], [*Matches*],
   `_`, [anything, binding nothing],
   `x`, [anything, binding it to `x`],
-  `0`, `true`, `"s"`, [a literal],
+  `0`, `-1`, `true`, `"s"`, [a literal],
   `(p, q)`, [a tuple, element by element],
   `{ x: p }`, [a record, field by field],
   `[]`, [the empty array],

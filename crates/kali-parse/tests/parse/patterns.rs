@@ -72,9 +72,13 @@ fn constructors() {
 }
 
 #[test]
-fn negative_literals_are_not_patterns_yet() {
-    // `-1` is a negation expression, and patterns have no negation.
-    rejects_pattern("-1");
+fn negative_literals() {
+    assert_eq!(pattern_sexp("-1"), "-1");
+    assert_eq!(pattern_sexp("-1.5"), "-1.5");
+    assert_eq!(pattern_sexp("-1 | 0"), "(| -1 0)");
+    rejects_pattern("-true");
+    rejects_pattern("- -1");
+    rejects_pattern("-x");
 }
 
 #[test]

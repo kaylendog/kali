@@ -14,7 +14,9 @@ fn patterns() {
 
 #[test]
 fn literal_patterns() {
-    assert_fixed(&arms("\t| true -> 1\n\t| \"s\" -> 2\n\t| () -> 3\n"));
+    assert_fixed(&arms(
+        "\t| true -> 1\n\t| \"s\" -> 2\n\t| () -> 3\n\t| -1 -> 4\n\t| -2.5 -> 5\n",
+    ));
 }
 
 #[test]

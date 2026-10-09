@@ -185,8 +185,14 @@ where
 
     // pattern ::= literal | variable | wildcard | tuple | record | empty_list | (pattern)
     let pattern = recursive(|pattern| {
-        // literal ::= literal_kind
-        let atom_literal = literal_kind
+        // literal ::= -? literal_kind
+        // Patterns have no negation, so a leading `-` is folded into a numeric literal.
+        let negative = just(Token::OpSubtract).ignore_then(select! {
+            Token::LitInteger(value) => LiteralKind::Integer(-value),
+            Token::LitFloat(value) => LiteralKind::Float(-value),
+        });
+        let atom_literal = negative
+            .or(literal_kind)
             .map(PatternKind::Literal)
             .labelled("literal pattern");
 

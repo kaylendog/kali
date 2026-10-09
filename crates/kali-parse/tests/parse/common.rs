@@ -48,6 +48,7 @@ fn render_pattern(pattern: &Pattern, module: &Module) -> String {
     match &pattern.kind {
         PatternKind::Var(ident) => name(ident),
         PatternKind::Literal(LiteralKind::Integer(value)) => value.to_string(),
+        PatternKind::Literal(LiteralKind::Float(value)) => value.to_string(),
         PatternKind::Wildcard => "_".into(),
         PatternKind::EmptyList => "[]".into(),
         PatternKind::Tuple(patterns) => format!("(tuple {})", many(patterns)),
