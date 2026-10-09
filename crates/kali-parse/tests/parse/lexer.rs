@@ -33,6 +33,7 @@ fn integers() {
     );
 }
 
+#[allow(clippy::approx_constant)]
 #[test]
 fn floats() {
     assert_eq!(
