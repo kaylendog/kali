@@ -271,3 +271,35 @@ fn comment<'src>(lex: &mut logos::Lexer<'src, Token<'src>>) -> Option<&'src str>
     lex.bump(end - start);
     Some(&lex.source()[start..end].trim_start())
 }
+
+#[cfg(test)]
+mod tests {
+    use logos::Logos;
+
+    use crate::Token;
+
+    #[test]
+    fn lex_comment() {
+        let src = r#"
+            // Hello, world!
+            /// Hello, world!
+            1234 // Hello, world!
+            5678 /// Hello, world!"#;
+        let tokens = Token::lexer(src)
+            .filter_map(|r| r.ok())
+            .filter(|tok| *tok != Token::Newline)
+            .collect::<Vec<Token>>();
+
+        pretty_assertions::assert_eq!(
+            vec![
+                Token::Comment("Hello, world!"),
+                Token::DocComment("Hello, world!"),
+                Token::LitNatural(1234),
+                Token::Comment("Hello, world!"),
+                Token::LitNatural(5678),
+                Token::DocComment("Hello, world!")
+            ],
+            tokens
+        );
+    }
+}
