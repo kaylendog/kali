@@ -1,17 +1,22 @@
-use std::path::PathBuf;
+mod debug;
 
 use clap::Parser;
-use kali_type::TypeInferenceEngine;
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber::EnvFilter;
 
-// mod compiler;
+use crate::debug::{debug, DebugCommand};
 
 /// Command line interface for the Kali programming language.
 #[derive(Parser)]
 struct Args {
     #[clap(subcommand)]
     command: Command,
+    #[clap(flatten)]
+    opts: GlobalOpts,
+}
+
+#[derive(Parser)]
+pub struct GlobalOpts {
     /// Enable verbose output.
     #[clap(short, long)]
     verbose: bool,
@@ -20,45 +25,27 @@ struct Args {
 #[derive(Parser)]
 enum Command {
     /// Debugging commands.
-    Debug {
-        /// The kind of debugging to perform.
-        #[clap(subcommand)]
-        kind: DebugKind,
-    },
-}
-
-/// The kind of debugging to perform.
-#[derive(Parser)]
-enum DebugKind {
-    Lex {
-        /// The file to lex.
-        file: PathBuf,
-    },
-    Parse {
-        /// The file to parse.
-        file: PathBuf,
-    },
-    Typecheck {
-        /// The file to typecheck.
-        file: PathBuf,
-    },
+    #[clap(subcommand)]
+    Debug(DebugCommand),
 }
 
 fn main() {
-    let args = Args::parse();
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            EnvFilter::builder()
+                .with_default_directive(LevelFilter::ERROR.into())
+                .from_env_lossy(),
+        )
+        .init();
 
-    // initialise tracing
-    let filter = EnvFilter::builder()
-        .with_default_directive(LevelFilter::ERROR.into())
-        .from_env_lossy();
+    let Args { command, opts } = Args::parse();
 
-    tracing_subscriber::fmt().with_env_filter(filter).init();
+    let result = match command {
+        Command::Debug(command) => debug(command, &opts),
+    };
 
-    match args.command {
-        Command::Debug { kind } => match kind {
-            DebugKind::Lex { file } => {}
-            DebugKind::Parse { file } => {}
-            DebugKind::Typecheck { file } => {}
-        },
+    if let Err(err) = result {
+        eprintln!("Error: {}", err);
+        std::process::exit(1);
     }
 }
