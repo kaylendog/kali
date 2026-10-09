@@ -220,6 +220,12 @@ impl Print for Module {
                 print_at(ctx, comment, comment.span.start, comment.span.end, 0)?;
             }
         }
+        // With no items, the comments pass has nothing to attach the comments to.
+        if self.items.is_empty() {
+            for comment in self.comments.values() {
+                print_at(ctx, comment, comment.span.start, comment.span.end, 0)?;
+            }
+        }
         if last_end.is_some() {
             ctx.newline()?;
         }
