@@ -1,3 +1,4 @@
-fn map f l = match l with
+let map = f l -> match l {
     | [] -> []
     | x :: xs -> (f x) :: map f xs
+}

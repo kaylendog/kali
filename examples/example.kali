@@ -1,5 +1,7 @@
-fn milamber a b = match a with
+let milamber = a b -> match a {
     | 0 -> b
-    | x -> match b with
+    | x -> match b {
         | 0 -> a
         | y -> x + y
+    }
+}

@@ -1,1 +1,3 @@
-fn add a b = a + b
+// awoof
+
+let add = a b -> a + b
