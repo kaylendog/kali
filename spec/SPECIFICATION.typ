@@ -1,3 +1,5 @@
+// Noto Sans is vendored in spec/fonts (SIL OFL 1.1). Compile with:
+//   typst compile --font-path spec/fonts spec/SPECIFICATION.typ
 #set text(
   font: "Noto Sans",
   size: 11pt
@@ -40,6 +42,15 @@ Specification - Version 1.0
   indent: 1cm,
 )
 
+// Marks a feature the parser or compiler does not implement yet.
+#let status(body) = block(
+  inset: 6pt,
+  radius: 3pt,
+  fill: luma(240),
+  width: 100%,
+  text(size: 9pt, [*Status:* #body]),
+)
+
 #pagebreak()
 
 = Introduction
@@ -54,29 +65,74 @@ Kali takes inspiration from a variety of existing programming languages, includi
 - Rust
 - TypeScript
 - OCaml
+- Go, for how line ends terminate items
 
 == Design Goals
 
 = Syntax
 
+== Lexical Structure
+
+=== Identifiers
+
+Identifiers are any run of word characters, including Unicode letters, and underscores. Keywords and primitive type names are reserved.
+
+```kali
+let add = a b -> a + b
+let μέσος = a b -> (a + b) / 2
+```
+
+=== Comments
+
+Line comments start with `//`. Doc comments start with `///` and attach to the item that follows them.
+
+```kali
+// Adds two numbers.
+let add = a b -> a + b
+
+/// The ratio of a circle's circumference to its diameter.
+let pi = 3
+```
+
+=== Items and Line Ends <items-and-line-ends>
+
+A module is a sequence of items: `let` definitions, `type` aliases and `import`s. Items are terminated by the end of a line, in the same way as Go: a line end acts as a terminator when the last token on the line could end an item, such as an identifier, a literal or a closing bracket. A line ending in an operator, a comma or an opening bracket continues onto the next line. An explicit `;` is also accepted.
+
+```kali
+let x = fib (n - 1) +
+  fib (n - 2)
+let y = [1,
+  2]
+```
+
+A consequence is that an operator must stay at the end of a line to continue it. Writing `+ fib (n - 2)` on its own line is an error.
+
 == Data Types
 
 === Primitives
 
-Like most programming languages, Kali has support for a variety of primitive data types:
+Kali has the following primitive data types. Type names are lowercase.
 
-- Integers
-- Floats
-- Booleans
-- Strings
+#table(
+  columns: 3,
+  [*Type*], [*Name*], [*Literals*],
+  [Natural], `nat`, `0`,
+  [Integer], `int`, `-5`,
+  [Float], `float`, `10.5`,
+  [Boolean], `bool`, `true`,
+  [String], `string`, `"Hello"`,
+  [Unit], `()`, `()`,
+)
 
-==== Integers
+==== Naturals and Integers
 
-Integers are whole numbers, and can be positive or negative.
+A number literal without a sign is a natural. A `-` immediately followed by digits is an integer literal, so `n - 1` must be written with spaces to mean subtraction. Literals may use `_` as a separator and the prefixes `0x`, `0o`, `0b` and `0d`.
 
 ```kali
 let x = 10
 let y = -5
+let big = 1_000_000
+let mask = 0xff
 ```
 
 ==== Floats
@@ -89,6 +145,8 @@ let y = -5.5
 ```
 
 Kali uses the IEEE 754 standard for floating point arithmetic.
+
+#status[The lexer has no float literal rule yet, so float literals are a parse error.]
 
 ==== Booleans
 
@@ -131,10 +189,10 @@ Composite data types are used to represent complex data structures, and are a fu
 Users can compose their own data types using these composite data types, and use them to build complex data structures.
 
 ```kali
-type Person = (String, Int, Bool)
-type Point = { x: Int, y: Int }
-type Shape = Circle(Int) | Rectangle(Int, Int)
-type List = Int[]
+type Person = (string, int, bool)
+type Point = { x: int, y: int }
+type Shape = Circle(int) | Rectangle(int, int)
+type List = [int]
 ```
 
 ==== Product Types
@@ -162,7 +220,7 @@ let unit = ()
 Sum types are a composite data type that can hold one of several different values. They are defined using the `|` syntax, with each value separated by a pipe.
 
 ```kali
-type Shape = Circle(Int) | Rectangle(Int, Int)
+type Shape = Circle(int) | Rectangle(int, int)
 ```
 
 Sum types support three types of variant: simple, tuple, and record.
@@ -174,25 +232,32 @@ sum_type =  sum_type_variant ("|" sum_type_variant)*
 sum_type_variant = type ("(" type ("," type)* ")")
 ```
 
+#status[Named constructors are not implemented. The parser currently reads `a | b` as a structural union of two types and `a & b` as an intersection, TypeScript style, with `|` binding tighter than `&`. Whether Kali keeps structural unions, adds constructors, or both, is an open decision.]
+
 ==== Arrays
 
-Arrays are a composite data type that can hold multiple values of the same type. They are defined using the `[]` syntax, with each value separated by a comma.
+Arrays are a composite data type that can hold multiple values of the same type. They are defined using the `[]` syntax, with each value separated by a comma. The type of an array of `int` is written `[int]`.
 
 ```kali
 let numbers = [1, 2, 3, 4, 5]
+let empty = []
 ```
 
 ```ebnf
-array_literal = "[" expr ("," expr)* "]"
-array_access = expr "[" expr "]"
+array_literal = "[" expr ("," expr)* "]" | "[]"
+array_type = "[" type "]"
 ```
+
+Arrays are taken apart with the `::` cons pattern, see @pattern-matching.
+
+#status[Indexing with `expr[i]` is not implemented.]
 
 ==== Records
 
 Records are a convenient way to define named composite data types.
 
 ```kali
-type Point = { x: Int, y: Int }
+type Point = { x: int, y: int }
 ```
 
 The syntax for a record is as follows:
@@ -209,6 +274,8 @@ let point = { x: 10, y: 20 }
 let x = point.x
 ```
 
+#status[Record types and record patterns parse. Record literals and `.` field access do not.]
+
 === Special
 
 There are a few special data types in Kali, which are used to represent special values.
@@ -221,7 +288,7 @@ There are a few special data types in Kali, which are used to represent special 
 The unit type is a special data type that has only one value, also called `unit`. It is used to represent the absence of a value, or a value that is not interesting.
 
 ```kali
-let unit = "()'
+let unit = ()
 ```
 
 ==== Never
@@ -262,67 +329,117 @@ let sign = if x > 0 {
 
 Because `if` is an expression, it can be used anywhere a value is expected, such as in variable bindings or function arguments.
 
-=== Pattern Matching
+#status[The parser accepts `if` without `else`; rejecting it is the type checker's job. `else if` is not parsed yet and must be written `else { if .. }`.]
 
-Pattern matching in Kali is inspired by Rust's powerful and expressive match expressions. It allows you to match values against patterns and execute code based on which pattern matches.
+=== Pattern Matching <pattern-matching>
+
+Pattern matching in Kali is inspired by OCaml and Rust. It allows you to match values against patterns and execute code based on which pattern matches.
 
 The basic syntax is as follows:
 
 ```kali
 match value {
-  pattern1 -> expr1,
-  pattern2 -> expr2,
-  _ -> expr_default,
+  | pattern1 -> expr1
+  | pattern2 -> expr2
+  | _ -> expr_default
 }
 ```
 
-Each arm consists of a pattern, the `->` symbol, and an expression to evaluate if the pattern matches. The `_` pattern is a catch-all that matches any value not matched by previous patterns.
+Each arm starts with `|`, followed by a pattern, the `->` symbol, and an expression to evaluate if the pattern matches. The braces close the match, so nested matches need no extra parentheses. The `_` pattern is a catch-all that matches any value not matched by previous patterns.
 
-For example, matching on a sum type:
+Patterns can destructure tuples, arrays, and records, and match on literals:
 
 ```kali
-type Shape = Circle(Int) | Rectangle(Int, Int)
+let describe = point -> match point {
+  | (0, 0) -> "origin"
+  | (x, 0) | (0, x) -> "on an axis"
+  | (x, y) -> "point"
+}
 
-let area = match shape {
-  Circle(r) => 3.14 * r * r,
-  Rectangle(w, h) => w * h,
+let sum = list -> match list {
+  | [] -> 0
+  | x :: rest -> x + sum rest
+}
+
+let origin = match point {
+  | { x: 0, y: 0 } -> true
+  | _ -> false
 }
 ```
 
-You can also use pattern matching with primitive types:
+The available patterns are:
+
+#table(
+  columns: 2,
+  [*Pattern*], [*Matches*],
+  `_`, [anything, binding nothing],
+  `x`, [anything, binding it to `x`],
+  `0`, `true`, `"s"`, [a literal],
+  `(p, q)`, [a tuple, element by element],
+  `{ x: p }`, [a record, field by field],
+  `[]`, [the empty array],
+  `p :: q`, [a non-empty array, as its head and tail],
+  `p | q`, [either pattern, an or-pattern],
+)
+
+Matching on a sum type:
 
 ```kali
-let result = match x {
-  0 => "zero",
-  1 => "one",
-  _ => "many",
-}
-```
+type Shape = Circle(int) | Rectangle(int, int)
 
-Patterns can destructure tuples, arrays, and records:
-
-```kali
-let point = (1, 2)
-let description = match point {
-  (0, 0) => "origin",
-  (x, y) => "point",
+let area = shape -> match shape {
+  | Circle(r) -> 3 * r * r
+  | Rectangle(w, h) -> w * h
 }
 ```
 
 Pattern matching in Kali is exhaustive: the compiler will warn if not all possible cases are covered, unless a catch-all `_` pattern is provided.
 
+#status[Constructor patterns such as `Circle(r)` depend on sum types, see above. Exhaustiveness checking is not implemented.]
+
 == Functions
+
+Functions are lambda expressions bound with `let`. Parameters are written before `->` separated by spaces, OCaml style, and a parameter with a type annotation is parenthesised.
+
+```kali
+let add = a b -> a + b
+let scale = (factor: int) value -> factor * value
+let fib = n -> match n {
+  | 0 -> 0
+  | 1 -> 1
+  | n -> fib (n - 1) + fib (n - 2)
+}
+```
+
+Application is by juxtaposition. An argument that is not a single token, such as `n - 1`, is parenthesised. Application binds tighter than every operator, so `fib (n - 1) + fib (n - 2)` is two calls and an addition.
+
+```kali
+let three = add 1 2
+```
+
+#status[`f x, y` with commas is also accepted as an uncurried call. Whether to keep it is an open decision.]
 
 === Higher-order Functions
 
-=== Currying
-
-Currying is the process of transforming a function that takes multiple arguments into a series of functions that each take a single argument.
+Functions are values and can be passed to and returned from other functions.
 
 ```kali
-let add = x: Int, y: Int => x + y
+let map = f list -> match list {
+  | [] -> []
+  | x :: rest -> f x :: map f rest
+}
+```
+
+=== Currying
+
+Currying is the process of transforming a function that takes multiple arguments into a series of functions that each take a single argument. `add 1 2` is `(add 1) 2`, so a function may be applied to fewer arguments than it has parameters.
+
+```kali
+let add = a b -> a + b
 let add1 = add 1
 ```
+
+#status[Lambdas parse this way. Partial application is a type checker and core IR concern and is not implemented.]
 
 = Type System
 
@@ -330,7 +447,11 @@ Kali's type system is heavily inspired by that of TypeScript and OCaml, and is d
 
 == Traits
 
-== Type Inferrence
+== Type Inference
+
+Types are inferred in the Hindley-Milner style. Annotations are optional and are used to constrain inference or document intent.
+
+#status[The type checker predates the current AST and does not compile. It is being rewritten.]
 
 = Memory Management
 
@@ -345,53 +466,63 @@ Kali uses an import/export system that allows code to be organized into reusable
 To make functions, types, or values available outside a module, use the `export` keyword:
 
 ```kali
-export let PI = 3.1415;
+export let pi = 3
 
-export fn area_circle(r: Float): Float {
-  PI * r * r
-}
+export let area_circle = (r: float) -> pi * r * r
 
-export type Point = { x: Int, y: Int };
+export type Point = { x: int, y: int }
 ```
 
 You can export multiple items from a module. Only exported items are accessible from other modules; non-exported items are private to the module.
 
+#status[`export` is lexed but not parsed.]
+
 === Importing
 
-To use exported items from another module, use the `import` keyword with path-based syntax. You can import all exported symbols from a module into scope:
+To use exported items from another module, use the `import` keyword with path-based syntax. Path segments are separated by `::`. You can import all exported symbols from a module into scope:
 
 ```kali
-import example::*;
+import example :: *
 ```
 
-Or import a specific item:
+Or import a specific item, optionally under another name:
 
 ```kali
-import example::add_one;
+import example :: add_one
+import example :: add_one as inc
 ```
 
-You can also import from nested modules or the standard library:
+Several items from one module can be imported in a list, and paths can be nested:
 
 ```kali
-import std::result::result;
-import std::vec::vec;
+import std :: { result, vec as v }
+import std :: result :: result
 ```
 
-This system allows Kali code to be modular, maintainable, and easy to share, using a concise and familiar path-based import syntax.
+```ebnf
+import = "import" tree
+tree = identifier "::" tree
+     | identifier [ "as" identifier ]
+     | "*"
+     | "{" tree { "," tree } "}"
+```
+
+#status[Imports parse. Resolving them to other files is not implemented.]
 
 = Standard Library
 
 Kali comes with a standard library that provides a wide range of functionality, including data structures, algorithms, and utilities.
 
-= Kali Virtual Machine
+= Compiler Pipeline
 
-Kali is designed to run on a virtual machine, namely the Kali Virtual Machine (KVM). This stack-based bytecode interpreter is capable of executing compiled Kali programs using a somewhat simple instruction set.
+Kali compiles in four stages.
 
-#table(
-  columns: 3,
-  "Name", "Opcode", "Description",
-  "NOP", "0x00", "No operation"
-)
+1. The parser produces an AST. Every node carries a span and a node id, and comments live in a side table rather than in the tree.
+2. Name resolution and type inference run over the AST and record their results in tables keyed by node id. The tree itself is never rewritten.
+3. The typed AST is elaborated into a small, explicitly typed core IR with no sugar. Pattern matching is compiled to decision trees and closures are converted here.
+4. Core is lowered to `pliron`, an MLIR-style SSA IR, from which native code is generated.
+
+#status[Only the parser exists. The earlier design, a stack-based bytecode interpreter, has been dropped.]
 
 = Interoperability
 
@@ -399,15 +530,17 @@ Kali is designed to run on a virtual machine, namely the Kali Virtual Machine (K
 
 == Compiler
 
-The compiler is a collection of tools used to compile Kali source code into its bytecode representation.
+The `kali` command line tool drives the pipeline. Its `debug` subcommands dump the output of each stage: `debug lex`, `debug parse` and `debug print`.
 
 == Parser
 
-The parser is a fully-fledged LALR(1) parser generated using the `lalrpop` parser generator. It constructs the AST from the source code directly with no intermediate representation.
+The lexer is generated with `logos` and the parser is written by hand with the `chumsky` combinator library, using Pratt parsing for operators. Between the two, line ends are turned into item terminators as described in @items-and-line-ends.
 
 == Passes
 
 == Formatter
+
+The formatter prints the AST back to source. It preserves comments and collapses runs of blank lines to one. Its output is stable: formatting formatted code changes nothing.
 
 == Package Manager
 
