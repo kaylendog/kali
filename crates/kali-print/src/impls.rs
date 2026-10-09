@@ -140,11 +140,12 @@ fn binary_op(kind: BinaryOpKind) -> (u8, Assoc) {
         // Bitwise and concat operators are not parsed yet; placed beside their nearest cousins.
         Multiply | Divide | Modulo | BitwiseShiftLeft | BitwiseShiftRight => (8, Assoc::Left),
         Add | Subtract => (7, Assoc::Left),
-        LessThan | LessThanOrEqual | GreaterThan | GreaterThanOrEqual => (6, Assoc::Left),
-        Equal | NotEqual => (5, Assoc::Left),
-        LogicalAnd | BitwiseAnd | BitwiseXor => (4, Assoc::Left),
-        LogicalOr | BitwiseOr => (3, Assoc::Left),
-        Cons | Concat => (2, Assoc::Right),
+        // Between arithmetic and comparison, as in OCaml and Haskell.
+        Cons | Concat => (6, Assoc::Right),
+        LessThan | LessThanOrEqual | GreaterThan | GreaterThanOrEqual => (5, Assoc::Left),
+        Equal | NotEqual => (4, Assoc::Left),
+        LogicalAnd | BitwiseAnd | BitwiseXor => (3, Assoc::Left),
+        LogicalOr | BitwiseOr => (2, Assoc::Left),
     }
 }
 

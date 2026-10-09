@@ -586,8 +586,17 @@ where
                 }),
                 binary_expr,
             ),
+            // Between arithmetic and comparison, as in OCaml and Haskell, so `x :: rest == l`
+            // compares the list.
             infix(
-                left(6),
+                right(6),
+                binary_op(select! {
+                    Token::OpCons => BinaryOpKind::Cons,
+                }),
+                binary_expr,
+            ),
+            infix(
+                left(5),
                 binary_op(select! {
                     Token::OpLessThanOrEqual => BinaryOpKind::LessThanOrEqual,
                     Token::OpGreaterThanOrEqual => BinaryOpKind::GreaterThanOrEqual,
@@ -597,7 +606,7 @@ where
                 binary_expr,
             ),
             infix(
-                left(5),
+                left(4),
                 binary_op(select! {
                     Token::OpEqual => BinaryOpKind::Equal,
                     Token::OpNotEqual => BinaryOpKind::NotEqual,
@@ -605,23 +614,16 @@ where
                 binary_expr,
             ),
             infix(
-                left(4),
+                left(3),
                 binary_op(select! {
                     Token::OpLogicalAnd => BinaryOpKind::LogicalAnd,
                 }),
                 binary_expr,
             ),
             infix(
-                left(3),
+                left(2),
                 binary_op(select! {
                     Token::OpLogicalOr => BinaryOpKind::LogicalOr,
-                }),
-                binary_expr,
-            ),
-            infix(
-                right(2),
-                binary_op(select! {
-                    Token::OpCons => BinaryOpKind::Cons,
                 }),
                 binary_expr,
             ),
