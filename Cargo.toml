@@ -3,6 +3,7 @@ resolver = "2"
 members = ["./crates/*"]
 
 [workspace.dependencies]
+pretty_assertions = "1.4.1"
 strum = { version = "0.24", features = ["derive"] }
 thiserror = "1.0"
 tracing = "0.1"
