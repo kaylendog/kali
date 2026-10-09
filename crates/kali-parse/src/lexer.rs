@@ -136,15 +136,15 @@ pub enum Token<'src> {
     Ident(&'src str),
 
     // literals
-    #[regex("[0-9][0-9_]*", |lex| lex.slice().replace('_', "").parse().ok())]
+    #[regex("[0-9][0-9_]*", |lex| lex.slice().replace('_', "").parse().map_err(LexicalError::InvalidInteger))]
     #[regex("0x[0-9a-fA-F][0-9a-fA-F_]*", |lex| prefixed_integer(lex))]
     #[regex("0b[01][01_]*", |lex| prefixed_integer(lex))]
     #[regex("0o[0-7][0-7_]*", |lex| prefixed_integer(lex))]
     #[regex("0d[0-9][0-9_]*", |lex| prefixed_integer(lex))]
     #[strum(to_string = "integer literal")]
     LitInteger(i64),
-    #[regex("[0-9][0-9_]*\\.[0-9][0-9_]*([eE][+-]?[0-9]+)?", |lex| lex.slice().replace('_', "").parse().ok().filter(|v: &f64| v.is_finite()))]
-    #[regex("[0-9][0-9_]*([eE][+-]?[0-9]+)", |lex| lex.slice().replace('_', "").parse().ok().filter(|v: &f64| v.is_finite()))]
+    #[regex("[0-9][0-9_]*\\.[0-9][0-9_]*([eE][+-]?[0-9]+)?", |lex| finite_float(lex))]
+    #[regex("[0-9][0-9_]*([eE][+-]?[0-9]+)", |lex| finite_float(lex))]
     #[strum(to_string = "float literal")]
     LitFloat(f64),
     #[token("true", |_| true)]
@@ -221,12 +221,17 @@ pub enum Token<'src> {
 
 #[derive(Default, Debug, Clone, PartialEq)]
 pub enum LexicalError {
+    /// An integer literal that is not valid.
     InvalidInteger(ParseIntError),
+    /// A float literal that is not finite (NaN or infinity).
+    FloatOutOfRange,
+    /// A token that could not be lexed.
     #[default]
     InvalidToken,
 }
 
-fn prefixed_integer<'src>(lex: &mut logos::Lexer<'src, Token<'src>>) -> Option<i64> {
+/// Parse an integer literal with a base prefix (0x, 0b, 0o, 0d) and ensure it is valid.
+fn prefixed_integer<'src>(lex: &mut logos::Lexer<'src, Token<'src>>) -> Result<i64, LexicalError> {
     let slice = lex.slice();
     let radix = match &slice[..2] {
         "0x" => 16,
@@ -240,7 +245,20 @@ fn prefixed_integer<'src>(lex: &mut logos::Lexer<'src, Token<'src>>) -> Option<i
         &slice[2..].replace('_', ""),
         radix,
     )
-    .ok()
+    .map_err(LexicalError::InvalidInteger)
+}
+
+/// Parse a float literal and ensure it is finite.
+fn finite_float<'src>(lex: &mut logos::Lexer<'src, Token<'src>>) -> Result<f64, LexicalError> {
+    let value: f64 = lex
+        .slice()
+        .replace('_', "")
+        .parse()
+        .expect("matched by the regex");
+    value
+        .is_finite()
+        .then_some(value)
+        .ok_or(LexicalError::FloatOutOfRange)
 }
 
 fn comment<'src>(lex: &mut logos::Lexer<'src, Token<'src>>) -> Option<&'src str> {
