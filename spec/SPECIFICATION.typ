@@ -410,7 +410,7 @@ let fib = n -> match n {
 }
 ```
 
-Application is by juxtaposition. An argument that is not a single token, such as `n - 1`, is parenthesised. Application binds tighter than every operator, so `fib (n - 1) + fib (n - 2)` is two calls and an addition.
+Application is by juxtaposition. An argument that is not a single token, such as `n - 1`, is parenthesised. Application binds tighter than every operator, see @operators, so `fib (n - 1) + fib (n - 2)` is two calls and an addition.
 
 ```kali
 let three = add 1 2
@@ -439,6 +439,37 @@ let add1 = add 1
 ```
 
 #status[Lambdas parse this way. Partial application is a type checker and core IR concern and is not implemented.]
+
+== Operators <operators>
+
+Operators group as in OCaml and Haskell: application binds tightest, prefix operators apply to a whole application, and `::` sits between arithmetic and comparison. From tightest to loosest:
+
+#table(
+  columns: 3,
+  [*Operators*], [*Associativity*], [*Example*],
+  [application `f x`], [left], [`f x y` is `(f x) y`],
+  [prefix `-`, `+`, `!`, `~`], [], [`-f x` is `-(f x)`],
+  [`**`], [right], [`a ** b ** c` is `a ** (b ** c)`],
+  [`*`, `/`, `%`], [left], [],
+  [`+`, `-`], [left], [],
+  [`::`], [right], [`a + b :: c` is `(a + b) :: c`],
+  [`<`, `<=`, `>`, `>=`], [left], [`x :: xs == l` is `(x :: xs) == l`],
+  [`==`, `!=`], [left], [],
+  [`&&`], [left], [],
+  [`||`], [left], [],
+  [`a b -> e`], [], [the body extends as far right as possible],
+)
+
+A prefix operator has no other meaning: `!` is logical not, never dereference, so `!f x` can only sensibly mean `!(f x)`. The formatter still parenthesises a compound operand, printing `-(f x)` and `!(f x)`, so the grouping is never misread.
+
+```kali
+let a = -f x + g y * 2 ** 3
+let b = x :: rest == l && !done || p < q
+```
+
+In patterns, `|` binds tighter than `::`: `a :: b | c` is `a :: (b | c)`.
+
+#status[`&`, `|`, `^`, `<<`, `>>` and `@` are lexed but not parsed as expression operators.]
 
 = Type System
 
