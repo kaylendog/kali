@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use chumsky::{
     extra::SimpleState,
     input::{Input, MapExtra, Stream, ValueInput},
@@ -5,22 +7,36 @@ use chumsky::{
     prelude::*,
 };
 use kali_ast::{
-    BinaryOp, BinaryOpKind, Definition, Destructor, DestructorKind, Expr, ExprKind, Ident,
-    ImportTree, ImportTreeKind, Item, ItemKind, LambdaParam, LiteralKind, MatchArm, Module,
-    Pattern, PatternKind, PrimitiveTypeKind, Type, TypeAlias, TypeKind, UnaryOp, UnaryOpKind,
-    Visibility,
+    BinaryOp, BinaryOpKind, Comment, CommentKind, Definition, Destructor, DestructorKind, Expr,
+    ExprKind, Ident, ImportTree, ImportTreeKind, Item, ItemKind, LambdaParam, LiteralKind,
+    MatchArm, Module, NodeId, Pattern, PatternKind, PrimitiveTypeKind, Type, TypeAlias, TypeKind,
+    UnaryOp, UnaryOpKind, Visibility,
 };
 use logos::Logos;
 
-use crate::lexer::Token;
+pub use crate::lexer::Token;
+
+/// Re-export.
+pub use chumsky::{self};
 
 mod lexer;
 
 /// Represents the state used during parsing, including a string interner for efficient string handling.
 #[derive(Default)]
 struct State {
+    /// A counter to generate unique identifiers for nodes in the abstract syntax tree (AST).
+    next_id: NodeId,
     /// A `Rodeo` instance from the `lasso` crate, used for interning strings to reduce memory usage and improve performance.
     rodeo: lasso::Rodeo,
+}
+
+impl State {
+    /// Generates a new unique identifier for a node in the abstract syntax tree (AST).
+    fn next_id(&mut self) -> NodeId {
+        let id = self.next_id;
+        self.next_id += 1;
+        id
+    }
 }
 
 /// Concrete type for the parser extras.
@@ -51,6 +67,7 @@ where
     I: ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>,
 {
     Expr {
+        id: e.state().next_id(),
         kind: ExprKind::BinaryExpr {
             op,
             lhs: Box::new(lhs),
@@ -143,9 +160,13 @@ where
             .labelled("record type");
 
         let atom = choice((primitive, named, tuple, list, record))
-            .map_with(|kind, e| Type {
-                kind,
-                span: e.span(),
+            .map_with(|kind, e| {
+                let state: &mut SimpleState<State> = e.state();
+                Type {
+                    id: state.next_id(),
+                    kind,
+                    span: e.span(),
+                }
             })
             .or(ty
                 .clone()
@@ -153,19 +174,27 @@ where
 
         // ty ::= ty & ty | ty | ty
         atom.pratt((
-            infix(right(1), just(Token::OpBitwiseAnd), |lhs, _, rhs, e| Type {
-                kind: TypeKind::Intersection {
-                    lhs: Box::new(lhs),
-                    rhs: Box::new(rhs),
-                },
-                span: e.span(),
+            infix(right(1), just(Token::OpBitwiseAnd), |lhs, _, rhs, e| {
+                let state: &mut SimpleState<State> = e.state();
+                Type {
+                    id: state.next_id(),
+                    kind: TypeKind::Intersection {
+                        lhs: Box::new(lhs),
+                        rhs: Box::new(rhs),
+                    },
+                    span: e.span(),
+                }
             }),
-            infix(right(2), just(Token::OpBitwiseOr), |lhs, _, rhs, e| Type {
-                kind: TypeKind::Union {
-                    lhs: Box::new(lhs),
-                    rhs: Box::new(rhs),
-                },
-                span: e.span(),
+            infix(right(2), just(Token::OpBitwiseOr), |lhs, _, rhs, e| {
+                let state: &mut SimpleState<State> = e.state();
+                Type {
+                    id: state.next_id(),
+                    kind: TypeKind::Union {
+                        lhs: Box::new(lhs),
+                        rhs: Box::new(rhs),
+                    },
+                    span: e.span(),
+                }
             }),
         ))
     })
@@ -226,9 +255,13 @@ where
             atom_record,
             atom_empty_list,
         ))
-        .map_with(|kind, e| Pattern {
-            kind,
-            span: e.span(),
+        .map_with(|kind, e| {
+            let state: &mut SimpleState<State> = e.state();
+            Pattern {
+                id: state.next_id(),
+                kind,
+                span: e.span(),
+            }
         })
         .or(pattern.delimited_by(just(Token::SymLParen), just(Token::SymRParen)))
         .labelled("pattern");
@@ -238,23 +271,31 @@ where
             infix(
                 Associativity::Right(1),
                 just(Token::OpCons),
-                |lhs, _, rhs, e| Pattern {
-                    kind: PatternKind::Cons {
-                        lhs: Box::new(lhs),
-                        rhs: Box::new(rhs),
-                    },
-                    span: e.span(),
+                |lhs, _, rhs, e| {
+                    let state: &mut SimpleState<State> = e.state();
+                    Pattern {
+                        id: state.next_id(),
+                        kind: PatternKind::Cons {
+                            lhs: Box::new(lhs),
+                            rhs: Box::new(rhs),
+                        },
+                        span: e.span(),
+                    }
                 },
             ),
             infix(
                 Associativity::Left(2),
                 just(Token::OpBitwiseOr),
-                |lhs, _, rhs, e| Pattern {
-                    kind: PatternKind::Or {
-                        lhs: Box::new(lhs),
-                        rhs: Box::new(rhs),
-                    },
-                    span: e.span(),
+                |lhs, _, rhs, e| {
+                    let state: &mut SimpleState<State> = e.state();
+                    Pattern {
+                        id: state.next_id(),
+                        kind: PatternKind::Or {
+                            lhs: Box::new(lhs),
+                            rhs: Box::new(rhs),
+                        },
+                        span: e.span(),
+                    }
                 },
             ),
         ))
@@ -280,11 +321,20 @@ where
             .map(DestructorKind::Tuple)
             .labelled("tuple destructor");
 
-        // record ::= { ident : destructor (, ident : destructor)* }
-        let atom_record = ident
+        // record_item := ident (: destructor)?
+        let atom_record_item = ident
             .clone()
-            .then_ignore(just(Token::SymColon))
-            .then(destructor.clone())
+            .then(
+                just(Token::SymColon)
+                    .ignore_then(destructor.clone())
+                    .or_not(),
+            )
+            .map(|(name, value)| (name, value))
+            .labelled("record item");
+
+        // record ::= { record_item (, record_item)* }
+        let atom_record = atom_record_item
+            .clone()
             .separated_by(just(Token::SymComma))
             .allow_trailing()
             .collect::<Vec<_>>()
@@ -293,9 +343,13 @@ where
             .labelled("record destructor");
 
         choice((atom_variable, atom_tuple, atom_record))
-            .map_with(|kind, e| Destructor {
-                kind,
-                span: e.span(),
+            .map_with(|kind, e| {
+                let state: &mut SimpleState<State> = e.state();
+                Destructor {
+                    id: state.next_id(),
+                    kind,
+                    span: e.span(),
+                }
             })
             .or(destructor.delimited_by(just(Token::SymLParen), just(Token::SymRParen)))
     })
@@ -357,21 +411,25 @@ where
             })
             .labelled("if expression");
 
-        // match_expr ::= match expr { pattern -> expr (, pattern -> expr)* }
+        // match_expr ::= match expr { (| pattern -> expr)+ }
         let atom_match = just(Token::KeywordMatch)
             .ignore_then(expr.clone())
             .then(
-                pattern
-                    .clone()
+                just(Token::OpBitwiseOr)
+                    .ignore_then(pattern.clone())
                     .then_ignore(just(Token::SymArrow))
                     .then(expr.clone())
-                    .map_with(|(pattern, expr), e| MatchArm {
-                        pattern,
-                        expr,
-                        span: e.span(),
+                    .map_with(|(pattern, expr), e| {
+                        let state: &mut SimpleState<State> = e.state();
+                        MatchArm {
+                            id: state.next_id(),
+                            pattern,
+                            expr,
+                            span: e.span(),
+                        }
                     })
-                    .separated_by(just(Token::SymComma))
-                    .allow_trailing()
+                    .repeated()
+                    .at_least(1)
                     .collect::<Vec<_>>()
                     .delimited_by(just(Token::SymLBrace), just(Token::SymRBrace)),
             )
@@ -389,9 +447,13 @@ where
             atom_if,
             atom_match,
         ))
-        .map_with(|kind, e| Expr {
-            kind,
-            span: e.span(),
+        .map_with(|kind, e| {
+            let state: &mut SimpleState<State> = e.state();
+            Expr {
+                id: state.next_id(),
+                kind,
+                span: e.span(),
+            }
         })
         .or(expr
             .clone()
@@ -399,23 +461,42 @@ where
 
         // expr ::= lambda | unary_expr | call | binary_expr
         atom.clone().pratt((
-            // lambda ::= (destructor (, destructor)* -> expr)
+            // lambda ::= param+ -> expr
+            // param ::= destructor | (destructor : ty)
+            // OCaml style: params are juxtaposed, annotations need parens. Lowest binding power
+            // so the body extends over every operator.
             prefix(
-                12,
-                destructor
-                    .clone()
-                    .then(ty.clone().or_not())
-                    .map(|(parameter, ty)| LambdaParam { parameter, ty })
-                    .separated_by(just(Token::SymComma))
-                    .collect::<Vec<_>>()
-                    .then_ignore(just(Token::SymArrow)),
-                |params, body, e| Expr {
-                    kind: ExprKind::Lambda {
-                        params,
-                        ret_ty: None,
-                        body: Box::new(body),
-                    },
-                    span: e.span(),
+                1,
+                choice((
+                    destructor
+                        .clone()
+                        .then_ignore(just(Token::SymColon))
+                        .then(ty.clone())
+                        .delimited_by(just(Token::SymLParen), just(Token::SymRParen))
+                        .map(|(parameter, ty)| LambdaParam {
+                            parameter,
+                            ty: Some(ty),
+                        }),
+                    destructor.clone().map(|parameter| LambdaParam {
+                        parameter,
+                        ty: None,
+                    }),
+                ))
+                .repeated()
+                .at_least(1)
+                .collect::<Vec<_>>()
+                .then_ignore(just(Token::SymArrow)),
+                |params, body, e| {
+                    let state: &mut SimpleState<State> = e.state();
+                    Expr {
+                        id: state.next_id(),
+                        kind: ExprKind::Lambda {
+                            params,
+                            ret_ty: None,
+                            body: Box::new(body),
+                        },
+                        span: e.span(),
+                    }
                 },
             ),
             // unary_expr ::= op expr
@@ -431,12 +512,16 @@ where
                     kind,
                     span: e.span(),
                 }),
-                |op, expr, e| Expr {
-                    kind: ExprKind::UnaryExpr {
-                        expr: Box::new(expr),
-                        op,
-                    },
-                    span: e.span(),
+                |op, expr, e| {
+                    let state: &mut SimpleState<State> = e.state();
+                    Expr {
+                        id: state.next_id(),
+                        kind: ExprKind::UnaryExpr {
+                            expr: Box::new(expr),
+                            op,
+                        },
+                        span: e.span(),
+                    }
                 },
             ),
             // call ::= expr (expr (, expr)*)
@@ -447,12 +532,16 @@ where
                     .separated_by(just(Token::SymComma))
                     .at_least(1)
                     .collect::<Vec<_>>()),
-                |function, arguments, e| Expr {
-                    kind: ExprKind::Call {
-                        function: Box::new(function),
-                        arguments,
-                    },
-                    span: e.span(),
+                |function, arguments, e| {
+                    let state: &mut SimpleState<State> = e.state();
+                    Expr {
+                        id: state.next_id(),
+                        kind: ExprKind::Call {
+                            function: Box::new(function),
+                            arguments,
+                        },
+                        span: e.span(),
+                    }
                 },
             ),
             // binary_expr ::= expr op expr
@@ -567,7 +656,9 @@ where
                 .map(ImportTreeKind::List)
                 .labelled("import list");
 
-            choice((item, segment, glob, list)).map_with(|kind, e| ImportTree {
+            // `segment` before `item`: both start with an identifier, and `item` would
+            // succeed on `std` alone, leaving `:: {..}` unparsed.
+            choice((segment, item, glob, list)).map_with(|kind, e| ImportTree {
                 kind,
                 span: e.span(),
             })
@@ -584,18 +675,69 @@ where
         .labelled("definition");
 
     // item ::= item_type_alias | item_import_tree | item_definition
-    let item = choice((item_type_alias, item_import_tree, item_definition))
-        .map_with(|kind, e| Item {
+    let item = choice((item_type_alias, item_import_tree, item_definition)).map_with(|kind, e| {
+        let state: &mut SimpleState<State> = e.state();
+        Item {
+            id: state.next_id(),
             visibility: Visibility::Inherited,
             kind,
             span: e.span(),
-        })
-        .labelled("item");
+        }
+    });
 
-    // module ::= item (; item)*
+    // module ::= item (; item)* ;?
     item.separated_by(just(Token::SymSemicolon))
+        .allow_trailing()
         .collect::<Vec<_>>()
-        .labelled("module")
+}
+
+/// Whether a newline after `token` ends the item, like Go's automatic semicolon insertion.
+fn ends_item(token: &Token) -> bool {
+    matches!(
+        token,
+        Token::Ident(_)
+            | Token::LitNatural(_)
+            | Token::LitInteger(_)
+            | Token::LitBool(_)
+            | Token::LitUnit
+            | Token::LitString(_)
+            | Token::TypeInteger
+            | Token::TypeNatural
+            | Token::TypeFloat
+            | Token::TypeBool
+            | Token::TypeString
+            | Token::SymRParen
+            | Token::SymRBracket
+            | Token::SymRBrace
+            | Token::SymArray
+            // `import std :: *` ends in a glob, so `*` at end of line terminates too.
+            | Token::OpMultiply
+    )
+}
+
+/// Lexes the given source code into a list of tokens.
+///
+/// # Arguments
+///
+/// * `src` - A string slice containing the source code to be parsed.
+///
+/// # Returns
+///
+/// * `Vec<Spanned<Token>>` - A vector of tokens with their corresponding spans.
+pub fn lex_str<'src>(src: &'src str) -> Vec<Spanned<Token<'src>>> {
+    Token::lexer(src)
+        .spanned()
+        .map(|(tok, span)| match tok {
+            Ok(tok) => Spanned {
+                inner: tok,
+                span: span.into(),
+            },
+            Err(e) => Spanned {
+                inner: Token::Error(e),
+                span: span.into(),
+            },
+        })
+        .collect()
 }
 
 /// Parses the given source code into a `Module` representation.
@@ -613,28 +755,84 @@ where
 ///
 /// ```
 /// let source = "let x = 42;";
-/// let result = parse_str(source);
-/// match result {
-///     Ok(module) => println!("Parsed successfully: {:?}", module),
-///     Err(errors) => println!("Parsing failed with errors: {:?}", errors),
-/// }
+/// let (module, errors) = kali_parse::parse_str(source);
+/// println!("Parsed module: {:?}", module);
+/// println!("Parsing errors: {:?}", errors);
 /// ```
-pub fn parse_str<'src>(src: &'src str) -> Result<Module, Vec<Rich<'src, Token<'src>>>> {
-    let token_iter = Token::lexer(src).spanned().map(|(tok, span)| match tok {
-        Ok(tok) => (tok, span.into()),
-        Err(e) => (Token::Error(e), span.into()),
-    });
-    let token_stream =
-        Stream::from_iter(token_iter).map((0..src.len()).into(), |(t, s): (_, _)| (t, s));
+pub fn parse_str<'src>(src: &'src str) -> (Option<Module>, Vec<Rich<'src, Token<'src>>>) {
+    let mut state: SimpleState<State> = State::default().into();
 
-    let mut state = State::default().into();
-    parser()
-        .parse_with_state(token_stream, &mut state)
-        .into_result()
-        .map(move |items| Module {
-            items,
-            cache: state.0.rodeo,
+    let tokens: Vec<(Token, SimpleSpan)> = Token::lexer(src)
+        .spanned()
+        .map(|(tok, span)| match tok {
+            Ok(tok) => (tok, span.into()),
+            Err(e) => (Token::Error(e), span.into()),
         })
+        .collect();
+
+    // Split comments out into their own table, and turn line ends into `;` where the line
+    // ends an item, unless the next significant token closes a bracket. Go does the same.
+    let mut comments = BTreeMap::new();
+    let mut significant = Vec::with_capacity(tokens.len());
+    let mut previous_ends_item = false;
+    for (index, (tok, span)) in tokens.iter().enumerate() {
+        match tok {
+            Token::Comment(contents) | Token::DocComment(contents) => {
+                let kind = match tok {
+                    Token::Comment(_) => CommentKind::Single,
+                    _ => CommentKind::Doc,
+                };
+                let contents = state.0.rodeo.get_or_intern(contents);
+                let comment = Comment {
+                    contents,
+                    kind,
+                    span: *span,
+                };
+                comments.insert(*span, comment);
+            }
+            Token::Newline => {}
+            _ => {
+                previous_ends_item = ends_item(tok);
+                significant.push((tok.clone(), *span));
+                continue;
+            }
+        }
+        let next_closes = tokens[index + 1..]
+            .iter()
+            .map(|(tok, _)| tok)
+            .find(|tok| {
+                !matches!(
+                    tok,
+                    Token::Newline | Token::Comment(_) | Token::DocComment(_)
+                )
+            })
+            .is_some_and(|tok| {
+                // `|` starts a match arm, so a line end before it continues the match.
+                matches!(
+                    tok,
+                    Token::SymRParen | Token::SymRBracket | Token::SymRBrace | Token::OpBitwiseOr
+                )
+            });
+        if std::mem::take(&mut previous_ends_item) && !next_closes {
+            significant.push((Token::SymSemicolon, *span));
+        }
+    }
+
+    let token_stream =
+        Stream::from_iter(significant).map((0..src.len()).into(), |(t, s): (_, _)| (t, s));
+
+    let (items, errors) = parser()
+        .parse_with_state(token_stream, &mut state)
+        .into_output_errors();
+
+    (
+        items.map(move |items| Module {
+            cache: state.0.rodeo,
+            items,
+            comments,
+        }),
+        errors,
+    )
 }
 
 /// The `kali!` macro is a utility for parsing Rust-like syntax into a `Module` representation.
@@ -651,9 +849,9 @@ pub fn parse_str<'src>(src: &'src str) -> Result<Module, Vec<Rich<'src, Token<'s
 /// # Example
 ///
 /// ```
-/// use your_crate_name::kali;
+/// use kali_parse::kali;
 ///
-/// let module = kali! {
+/// let (module, errors) = kali! {
 ///     let x = 42;
 /// };
 /// println!("{:?}", module);
@@ -668,6 +866,6 @@ pub fn parse_str<'src>(src: &'src str) -> Result<Module, Vec<Rich<'src, Token<'s
 macro_rules! kali {
     ($($tts:tt)*) => {{
         let input = stringify!($($tts)*);
-        $crate::parse_str(input).unwrap()
+        $crate::parse_str(input)
     }};
 }

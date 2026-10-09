@@ -32,7 +32,7 @@ pub trait Visitor {
     /// # Returns
     ///
     /// A `Result` indicating success or failure.
-    fn visit_module(&mut self, module: &Module) -> Result<(), Self::Error> {
+    fn visit_module(&mut self, _module: &Module) -> Result<(), Self::Error> {
         Ok(())
     }
 
@@ -45,7 +45,7 @@ pub trait Visitor {
     /// # Returns
     ///
     /// A `Result` indicating success or failure.
-    fn visit_item(&mut self, item: &Item) -> Result<(), Self::Error> {
+    fn visit_item(&mut self, _item: &Item) -> Result<(), Self::Error> {
         Ok(())
     }
 
@@ -58,7 +58,7 @@ pub trait Visitor {
     /// # Returns
     ///
     /// A `Result` indicating success or failure.
-    fn visit_import_tree(&mut self, import_tree: &ImportTree) -> Result<(), Self::Error> {
+    fn visit_import_tree(&mut self, _import_tree: &ImportTree) -> Result<(), Self::Error> {
         Ok(())
     }
 
@@ -71,7 +71,7 @@ pub trait Visitor {
     /// # Returns
     ///
     /// A `Result` indicating success or failure.
-    fn visit_type_alias(&mut self, type_alias: &TypeAlias) -> Result<(), Self::Error> {
+    fn visit_type_alias(&mut self, _type_alias: &TypeAlias) -> Result<(), Self::Error> {
         Ok(())
     }
 
@@ -84,7 +84,7 @@ pub trait Visitor {
     /// # Returns
     ///
     /// A `Result` indicating success or failure.
-    fn visit_type(&mut self, ty: &Type) -> Result<(), Self::Error> {
+    fn visit_type(&mut self, _ty: &Type) -> Result<(), Self::Error> {
         Ok(())
     }
 
@@ -97,7 +97,7 @@ pub trait Visitor {
     /// # Returns
     ///
     /// A `Result` indicating success or failure.
-    fn visit_definition(&mut self, definition: &Definition) -> Result<(), Self::Error> {
+    fn visit_definition(&mut self, _definition: &Definition) -> Result<(), Self::Error> {
         Ok(())
     }
 
@@ -110,7 +110,7 @@ pub trait Visitor {
     /// # Returns
     ///
     /// A `Result` indicating success or failure.
-    fn visit_ident(&mut self, ident: &Ident) -> Result<(), Self::Error> {
+    fn visit_ident(&mut self, _ident: &Ident) -> Result<(), Self::Error> {
         Ok(())
     }
 
@@ -123,7 +123,7 @@ pub trait Visitor {
     /// # Returns
     ///
     /// A `Result` indicating success or failure.
-    fn visit_expr(&mut self, expr: &Expr) -> Result<(), Self::Error> {
+    fn visit_expr(&mut self, _expr: &Expr) -> Result<(), Self::Error> {
         Ok(())
     }
 
@@ -136,7 +136,7 @@ pub trait Visitor {
     /// # Returns
     ///
     /// A `Result` indicating success or failure.
-    fn visit_match_arm(&mut self, match_arm: &MatchArm) -> Result<(), Self::Error> {
+    fn visit_match_arm(&mut self, _match_arm: &MatchArm) -> Result<(), Self::Error> {
         Ok(())
     }
 
@@ -149,7 +149,7 @@ pub trait Visitor {
     /// # Returns
     ///
     /// A `Result` indicating success or failure.
-    fn visit_pattern(&mut self, pattern: &Pattern) -> Result<(), Self::Error> {
+    fn visit_pattern(&mut self, _pattern: &Pattern) -> Result<(), Self::Error> {
         Ok(())
     }
 
@@ -162,7 +162,7 @@ pub trait Visitor {
     /// # Returns
     ///
     /// A `Result` indicating success or failure.
-    fn visit_destructor(&mut self, destructor: &Destructor) -> Result<(), Self::Error> {
+    fn visit_destructor(&mut self, _destructor: &Destructor) -> Result<(), Self::Error> {
         Ok(())
     }
 
@@ -175,7 +175,7 @@ pub trait Visitor {
     /// # Returns
     ///
     /// A `Result` indicating success or failure.
-    fn visit_lambda_param(&mut self, lambda_param: &LambdaParam) -> Result<(), Self::Error> {
+    fn visit_lambda_param(&mut self, _lambda_param: &LambdaParam) -> Result<(), Self::Error> {
         Ok(())
     }
 }
@@ -196,6 +196,11 @@ pub enum WalkOrder {
 }
 
 impl Walker {
+    /// Creates a walker that visits nodes in the given order.
+    pub fn new(order: WalkOrder) -> Self {
+        Self { order }
+    }
+
     /// Walks a module within the Kali AST.
     ///
     /// # Arguments

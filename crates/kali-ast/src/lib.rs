@@ -1,6 +1,8 @@
-use std::hash::Hash;
+use std::{collections::BTreeMap, hash::Hash};
 
 mod visit;
+
+pub use visit::{Visitor, WalkOrder, Walker};
 
 /// Represents a module in the source code, containing a collection of items and a string interning cache.
 #[derive(Debug, Clone)]
@@ -9,7 +11,13 @@ pub struct Module {
     pub items: Vec<Item>,
     /// A string interning cache used to efficiently store and retrieve strings within the module.
     pub cache: lasso::Rodeo,
+    /// A collection of comments found in the source code, keyed by their span.
+    pub comments: BTreeMap<chumsky::span::SimpleSpan, Comment>,
 }
+
+/// The type used to uniquely identify nodes in the abstract syntax tree (AST). Aliased in case I
+/// ever change this to something fancier like `rustc`'s `NodeId` type.
+pub type NodeId = u32;
 
 /// Represents an identifier in the source code, including its textual value and span.
 #[derive(Debug, Clone, Copy)]
@@ -34,9 +42,31 @@ impl Hash for Ident {
     }
 }
 
+/// Represents one of the three types of comments found in the source code.
+#[derive(Debug, Clone)]
+pub struct Comment {
+    /// The contents of the comment.
+    pub contents: lasso::Spur,
+    /// The kind of comment.
+    pub kind: CommentKind,
+    /// The span of the comment in the source code.
+    pub span: chumsky::span::SimpleSpan,
+}
+
+/// An enumeration of the three kinds of comment.
+#[derive(Debug, Clone, Copy)]
+pub enum CommentKind {
+    /// A normal comment, e.g. `// Hello, world!`
+    Single,
+    /// A doc comment, e.g. `/// Hello, world!`
+    Doc,
+}
+
 /// Represents an item in the source code, such as a function, struct, or module.
 #[derive(Debug, Clone)]
 pub struct Item {
+    /// A unique identifier for the item in the abstract syntax tree (AST).
+    pub id: NodeId,
     /// The span of the item in the source code.
     pub span: chumsky::span::SimpleSpan,
     /// The kind of the item (e.g., function, struct, etc.).
@@ -96,7 +126,7 @@ pub enum ImportTreeKind {
     },
     /// Represents a glob import (e.g., `*`).
     Glob,
-    /// Represents a list wof import trees.
+    /// Represents a list of import trees.
     List(Vec<ImportTree>),
 }
 
@@ -112,6 +142,8 @@ pub struct TypeAlias {
 /// Represents a type in the source code, including its span and kind.
 #[derive(Debug, Clone)]
 pub struct Type {
+    /// A unique identifier for the type in the abstract syntax tree (AST).
+    pub id: NodeId,
     /// The span of the type in the source code.
     pub span: chumsky::span::SimpleSpan,
     /// The kind of type (primitive, function, tuple, etc.).
@@ -178,6 +210,8 @@ pub struct Definition {
 /// Represents an expression item in the source code.
 #[derive(Debug, Clone)]
 pub struct Expr {
+    /// A unique identifier for the expression in the abstract syntax tree (AST).
+    pub id: NodeId,
     /// The span of the expression in the source code.
     pub span: chumsky::span::SimpleSpan,
     /// The kind of expression.
@@ -347,6 +381,8 @@ pub enum UnaryOpKind {
 /// Represents a single arm of a match expression.
 #[derive(Debug, Clone)]
 pub struct MatchArm {
+    /// A unique identifier for the arm in the abstract syntax tree (AST).
+    pub id: NodeId,
     /// The span of the match arm in the source code.
     pub span: chumsky::span::SimpleSpan,
     /// The pattern to match.
@@ -358,6 +394,8 @@ pub struct MatchArm {
 /// Represents the kind of pattern in a match arm.
 #[derive(Debug, Clone)]
 pub struct Pattern {
+    /// A unique identifier for the pattern in the abstract syntax tree (AST).
+    pub id: NodeId,
     /// The span of the pattern in the source code.
     pub span: chumsky::span::SimpleSpan,
     /// The kind of pattern (literal, identifier, tuple, etc.).
@@ -405,6 +443,8 @@ pub struct LambdaParam {
 /// Represents a destructor pattern, which is a pattern with only free variables.
 #[derive(Debug, Clone)]
 pub struct Destructor {
+    /// A unique identifier for the destructor in the abstract syntax tree (AST).
+    pub id: NodeId,
     /// The span of the destructor in the source code.
     pub span: chumsky::span::SimpleSpan,
     /// THe kind of destructor.
@@ -419,7 +459,7 @@ pub enum DestructorKind {
     /// A tuple destructor with multiple patterns.
     Tuple(Vec<Destructor>),
     /// A record destructor with named fields.
-    Record(indexmap::IndexMap<Ident, Destructor>),
+    Record(indexmap::IndexMap<Ident, Option<Destructor>>),
     /// A cons destructor (e.g., `a :: b`).
     Cons {
         lhs: Box<Destructor>,
