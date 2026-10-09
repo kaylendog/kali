@@ -516,8 +516,9 @@ where
                 },
             ),
             // unary_expr ::= op expr
+            // Below call, so `-f x` is `-(f x)`: application binds tighter than every operator.
             prefix(
-                11,
+                10,
                 select! {
                      Token::OpAdd => UnaryOpKind::UnaryPlus,
                      Token::OpBitwiseNot => UnaryOpKind::BitwiseNot,
@@ -542,7 +543,7 @@ where
             ),
             // call ::= expr (expr (, expr)*)
             postfix(
-                10,
+                11,
                 just(Token::LitUnit).to(vec![]).or(atom
                     .clone()
                     .separated_by(just(Token::SymComma))

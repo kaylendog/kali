@@ -129,8 +129,8 @@ enum Assoc {
 
 /// Binding power of nodes that are never split by an operator.
 const ATOM: u8 = u8::MAX;
-const UNARY: u8 = 11;
-const CALL: u8 = 10;
+const CALL: u8 = 11;
+const UNARY: u8 = 10;
 const LAMBDA: u8 = 1;
 
 fn binary_op(kind: BinaryOpKind) -> (u8, Assoc) {
@@ -503,7 +503,9 @@ impl Print for Expr {
             }
             ExprKind::UnaryExpr { op, expr } => {
                 write!(ctx, "{}", op.kind)?;
-                print_operand(ctx, expr, UNARY)
+                // Always parenthesise a compound operand: `-f y` reads as `(-f) y` to anyone
+                // used to OCaml, so print `-(f y)` even though the parser needs no parens.
+                print_operand(ctx, expr, ATOM)
             }
             ExprKind::Tuple(exprs) => {
                 ctx.write_many("(", ")", ", ", exprs, |ctx, expr| expr.print(ctx))
