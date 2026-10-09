@@ -9,4 +9,3 @@ indexmap = "2.13.0"
 lasso = "0.7.3"
 
 strum = { workspace = true }
-tracing = { workspace = true }
