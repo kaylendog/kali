@@ -9,8 +9,8 @@ use chumsky::{
 use kali_ast::{
     BinaryOp, BinaryOpKind, Comment, CommentKind, Definition, Destructor, DestructorKind, Expr,
     ExprKind, Ident, ImportTree, ImportTreeKind, Item, ItemKind, LambdaParam, LiteralKind,
-    MatchArm, Module, NodeId, Pattern, PatternKind, PrimitiveTypeKind, Type, TypeAlias, TypeKind,
-    UnaryOp, UnaryOpKind, Visibility,
+    MatchArm, Module, NodeId, Pattern, PatternKind, PrimitiveTypeKind, Type, TypeAlias, TypeDecl,
+    TypeKind, UnaryOp, UnaryOpKind, Variant, Visibility,
 };
 use logos::Logos;
 
@@ -92,7 +92,20 @@ where
         })
         .labelled("identifier");
 
-    // literal_kind ::= LitBool | LitInteger | LitNatural | LitUnit | LitString
+    // constructor ::= Ident starting with an uppercase letter
+    let constructor = select! {
+        Token::Ident(name) if name.chars().next().is_some_and(char::is_uppercase) => name
+    }
+    .map_with(|name, e| {
+        let state: &mut SimpleState<State> = e.state();
+        Ident {
+            key: state.rodeo.get_or_intern(name),
+            span: e.span(),
+        }
+    })
+    .labelled("constructor");
+
+    // literal_kind ::= LitBool | LitInteger | LitUnit | LitString
     let literal_kind = choice((
         select! {
             Token::LitBool(value) => LiteralKind::Bool(value),
@@ -114,7 +127,7 @@ where
 
     // ty ::= primitive | named | tuple | list | record | (ty)
     let ty = recursive(|ty| {
-        // primitive ::= TypeBool | TypeFloat | TypeInteger | TypeNatural | TypeString | LitUnit
+        // primitive ::= TypeBool | TypeFloat | TypeInteger | TypeString | LitUnit
         let primitive = select! {
             Token::TypeBool => PrimitiveTypeKind::Bool,
             Token::TypeFloat => PrimitiveTypeKind::Float,
@@ -157,7 +170,7 @@ where
             .map(|entries| TypeKind::Record(indexmap::IndexMap::from_iter(entries)))
             .labelled("record type");
 
-        let atom = choice((primitive, named, tuple, list, record))
+        choice((primitive, named, tuple, list, record))
             .map_with(|kind, e| {
                 let state: &mut SimpleState<State> = e.state();
                 Type {
@@ -168,33 +181,7 @@ where
             })
             .or(ty
                 .clone()
-                .delimited_by(just(Token::SymLParen), just(Token::SymRParen)));
-
-        // ty ::= ty & ty | ty | ty
-        atom.pratt((
-            infix(right(1), just(Token::OpBitwiseAnd), |lhs, _, rhs, e| {
-                let state: &mut SimpleState<State> = e.state();
-                Type {
-                    id: state.next_id(),
-                    kind: TypeKind::Intersection {
-                        lhs: Box::new(lhs),
-                        rhs: Box::new(rhs),
-                    },
-                    span: e.span(),
-                }
-            }),
-            infix(right(2), just(Token::OpBitwiseOr), |lhs, _, rhs, e| {
-                let state: &mut SimpleState<State> = e.state();
-                Type {
-                    id: state.next_id(),
-                    kind: TypeKind::Union {
-                        lhs: Box::new(lhs),
-                        rhs: Box::new(rhs),
-                    },
-                    span: e.span(),
-                }
-            }),
-        ))
+                .delimited_by(just(Token::SymLParen), just(Token::SymRParen)))
     })
     .labelled("type");
 
@@ -205,6 +192,35 @@ where
             .clone()
             .map(PatternKind::Literal)
             .labelled("literal pattern");
+
+        // constructor_pattern ::= constructor [( pattern (, pattern)* )]
+        // A single payload pattern is used as is; several become a tuple pattern.
+        let constructor_payload = pattern
+            .clone()
+            .separated_by(just(Token::SymComma))
+            .at_least(1)
+            .allow_trailing()
+            .collect::<Vec<_>>()
+            .map_with(|mut patterns, e| {
+                if patterns.len() == 1 {
+                    return patterns.remove(0);
+                }
+                let state: &mut SimpleState<State> = e.state();
+                Pattern {
+                    id: state.next_id(),
+                    kind: PatternKind::Tuple(patterns),
+                    span: e.span(),
+                }
+            })
+            .delimited_by(just(Token::SymLParen), just(Token::SymRParen));
+        let atom_constructor = constructor
+            .clone()
+            .then(constructor_payload.or_not())
+            .map(|(name, payload)| PatternKind::Constructor {
+                name,
+                payload: payload.map(Box::new),
+            })
+            .labelled("constructor pattern");
 
         // variable ::= ident
         let atom_variable = ident
@@ -245,8 +261,10 @@ where
             .to(PatternKind::EmptyList)
             .labelled("empty list pattern");
 
+        // `atom_constructor` before `atom_variable`: both accept an identifier.
         let atom = choice((
             atom_literal,
+            atom_constructor,
             atom_variable,
             atom_wildcard,
             atom_tuple,
@@ -610,6 +628,56 @@ where
     })
     .labelled("expression");
 
+    // item_type_decl ::= type ident = |? variant (| variant)*
+    // variant ::= constructor [( ty (, ty)* )]
+    // A single payload type is used as is; several become a tuple type.
+    let variant_payload = ty
+        .clone()
+        .separated_by(just(Token::SymComma))
+        .at_least(1)
+        .allow_trailing()
+        .collect::<Vec<_>>()
+        .map_with(|mut types, e| {
+            if types.len() == 1 {
+                return types.remove(0);
+            }
+            let state: &mut SimpleState<State> = e.state();
+            Type {
+                id: state.next_id(),
+                kind: TypeKind::Tuple(types),
+                span: e.span(),
+            }
+        })
+        .delimited_by(just(Token::SymLParen), just(Token::SymRParen));
+    let variant = constructor
+        .clone()
+        .then(variant_payload.or_not())
+        .map_with(|(name, payload), e| Variant {
+            name,
+            payload,
+            span: e.span(),
+        })
+        .labelled("variant");
+    let item_type_decl = just(Token::KeywordType)
+        .ignore_then(ident.clone())
+        .then_ignore(just(Token::OpAssign))
+        .then(
+            just(Token::OpBitwiseOr).or_not().ignore_then(
+                variant
+                    .separated_by(just(Token::OpBitwiseOr))
+                    .at_least(1)
+                    .collect::<Vec<_>>(),
+            ),
+        )
+        .map(|(name, variants)| {
+            ItemKind::TypeDecl(TypeDecl {
+                name,
+                params: Vec::new(),
+                variants,
+            })
+        })
+        .labelled("type declaration");
+
     // item_type_alias ::= type ident = ty
     let item_type_alias = just(Token::KeywordType)
         .ignore_then(ident.clone())
@@ -672,8 +740,15 @@ where
         .map(|(name, expr)| ItemKind::Definition(Definition { name, expr }))
         .labelled("definition");
 
-    // item ::= item_type_alias | item_import_tree | item_definition
-    let item = choice((item_type_alias, item_import_tree, item_definition)).map_with(|kind, e| {
+    // item ::= item_type_decl | item_type_alias | item_import_tree | item_definition
+    // `item_type_decl` first: `type Foo = Bar` is a one-variant sum type, not an alias.
+    let item = choice((
+        item_type_decl,
+        item_type_alias,
+        item_import_tree,
+        item_definition,
+    ))
+    .map_with(|kind, e| {
         let state: &mut SimpleState<State> = e.state();
         Item {
             id: state.next_id(),

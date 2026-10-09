@@ -6,7 +6,8 @@ use std::{
 use kali_ast::{
     BinaryOpKind, Comment, CommentKind, Definition, Destructor, DestructorKind, Expr, ExprKind,
     Ident, ImportTree, ImportTreeKind, Item, ItemKind, LambdaParam, LiteralKind, MatchArm, Module,
-    NodeId, Pattern, PatternKind, PrimitiveTypeKind, Type, TypeAlias, TypeKind, Visibility,
+    NodeId, Pattern, PatternKind, PrimitiveTypeKind, Type, TypeAlias, TypeDecl, TypeKind,
+    Visibility,
 };
 
 use crate::{error::Result, pass::Comments};
@@ -174,16 +175,6 @@ fn pattern_precedence(pattern: &Pattern) -> (u8, Assoc) {
     }
 }
 
-fn type_precedence(ty: &Type) -> (u8, Assoc) {
-    match &ty.kind {
-        // Function types are not parsed yet; always parenthesised when nested.
-        TypeKind::Fn(..) => (0, Assoc::Right),
-        TypeKind::Intersection { .. } => (1, Assoc::Right),
-        TypeKind::Union { .. } => (2, Assoc::Right),
-        _ => (ATOM, Assoc::Left),
-    }
-}
-
 /// Prints `child`, parenthesised if its binding power is below `minimum`.
 fn print_child<T: Print>(ctx: &mut Context, child: &T, precedence: u8, minimum: u8) -> Result<()> {
     if precedence < minimum {
@@ -267,6 +258,7 @@ impl Print for Item {
         match &self.kind {
             ItemKind::Definition(definition) => definition.print(ctx),
             ItemKind::TypeAlias(alias) => alias.print(ctx),
+            ItemKind::TypeDecl(decl) => decl.print(ctx),
             ItemKind::Import(import) => {
                 write!(ctx, "import ")?;
                 import.print(ctx)
@@ -321,11 +313,6 @@ impl Print for ImportTree {
 
 impl Print for Type {
     fn print(&self, ctx: &mut Context) -> Result<()> {
-        let (precedence, assoc) = type_precedence(self);
-        let (lhs_min, rhs_min) = operand_minimums(precedence, assoc);
-        let print_operand = |ctx: &mut Context, ty: &Type, minimum| {
-            print_child(ctx, ty, type_precedence(ty).0, minimum)
-        };
         match &self.kind {
             TypeKind::Primitive(primitive) => {
                 let name = match primitive {
@@ -358,17 +345,35 @@ impl Print for Type {
                 write!(ctx, " -> ")?;
                 ret.print(ctx)
             }
-            TypeKind::Intersection { lhs, rhs } => {
-                print_operand(ctx, lhs, lhs_min)?;
-                write!(ctx, " & ")?;
-                print_operand(ctx, rhs, rhs_min)
-            }
-            TypeKind::Union { lhs, rhs } => {
-                print_operand(ctx, lhs, lhs_min)?;
-                write!(ctx, " | ")?;
-                print_operand(ctx, rhs, rhs_min)
+        }
+    }
+}
+
+impl Print for TypeDecl {
+    fn print(&self, ctx: &mut Context) -> Result<()> {
+        write!(ctx, "type ")?;
+        self.name.print(ctx)?;
+        write!(ctx, " =")?;
+        ctx.increase();
+        for variant in &self.variants {
+            ctx.newline()?;
+            write!(ctx, "| ")?;
+            variant.name.print(ctx)?;
+            // `Rectangle(int, int)` is one tuple payload, printed without double parens.
+            match variant.payload.as_ref().map(|ty| &ty.kind) {
+                None => {}
+                Some(TypeKind::Tuple(types)) => {
+                    ctx.write_many("(", ")", ", ", types, |ctx, ty| ty.print(ctx))?;
+                }
+                Some(_) => {
+                    write!(ctx, "(")?;
+                    variant.payload.as_ref().unwrap().print(ctx)?;
+                    write!(ctx, ")")?;
+                }
             }
         }
+        ctx.decrease();
+        Ok(())
     }
 }
 
@@ -404,6 +409,20 @@ impl Print for Pattern {
             PatternKind::Wildcard => Ok(write!(ctx, "_")?),
             PatternKind::EmptyList => Ok(write!(ctx, "[]")?),
             PatternKind::Rest => Ok(write!(ctx, "...")?),
+            PatternKind::Constructor { name, payload } => {
+                name.print(ctx)?;
+                match payload.as_deref().map(|pattern| &pattern.kind) {
+                    None => Ok(()),
+                    Some(PatternKind::Tuple(patterns)) => {
+                        ctx.write_many("(", ")", ", ", patterns, |ctx, pattern| pattern.print(ctx))
+                    }
+                    Some(_) => {
+                        write!(ctx, "(")?;
+                        payload.as_ref().unwrap().print(ctx)?;
+                        Ok(write!(ctx, ")")?)
+                    }
+                }
+            }
             PatternKind::Tuple(patterns) => {
                 ctx.write_many("(", ")", ", ", patterns, |ctx, pattern| pattern.print(ctx))
             }

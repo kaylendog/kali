@@ -96,8 +96,31 @@ fn patterns() {
 #[test]
 fn items() {
     assert_round_trip(
-        "import std :: { io as x, * }\ntype P = { x: int, y: int } | [nat]",
-        "import std :: { io as x, * }\ntype P = { x: int, y: int } | [nat]\n",
+        "import std :: { io as x, * }\ntype P = { x: int, y: int }\ntype L = [int]",
+        "import std :: { io as x, * }\ntype P = { x: int, y: int }\ntype L = [int]\n",
+    );
+}
+
+#[test]
+fn sum_types() {
+    let expected = "\
+type Shape =
+\t| Circle(int)
+\t| Rectangle(int, int)
+\t| Point
+let circle = Circle 3
+let rect = Rectangle (2, 4)
+let area = shape -> match shape {
+\t| Circle(r) -> 3 * r * r
+\t| Rectangle(w, h) -> w * h
+\t| Point -> 0
+}
+";
+    assert_round_trip(expected, expected);
+    // One line, no leading pipe, and a bare constructor is a one-variant sum type.
+    assert_round_trip(
+        "type Shape = Circle(int) | Point\ntype Foo = Bar",
+        "type Shape =\n\t| Circle(int)\n\t| Point\ntype Foo =\n\t| Bar\n",
     );
 }
 

@@ -82,6 +82,8 @@ pub enum ItemKind {
     Import(ImportTree),
     /// Represents a type alias.
     TypeAlias(TypeAlias),
+    /// Represents a sum type declaration.
+    TypeDecl(TypeDecl),
     /// Represents a definition in the source code.
     Definition(Definition),
 }
@@ -139,6 +141,28 @@ pub struct TypeAlias {
     pub ty: Type,
 }
 
+/// A sum type declaration, e.g. `type Shape = Circle(int) | Point`.
+#[derive(Debug, Clone)]
+pub struct TypeDecl {
+    /// The name of the type.
+    pub name: Ident,
+    /// Generic parameters. Always empty until generics are parsed.
+    pub params: Vec<Ident>,
+    /// The variants, in declaration order.
+    pub variants: Vec<Variant>,
+}
+
+/// One variant of a sum type. Its constructor is a function from the payload to the type.
+#[derive(Debug, Clone)]
+pub struct Variant {
+    /// The constructor name.
+    pub name: Ident,
+    /// The payload type. `Circle(int)` is `int`, `Rectangle(int, int)` is a tuple, `Point` is none.
+    pub payload: Option<Type>,
+    /// The span of the variant in the source code.
+    pub span: chumsky::span::SimpleSpan,
+}
+
 /// Represents a type in the source code, including its span and kind.
 #[derive(Debug, Clone)]
 pub struct Type {
@@ -165,20 +189,6 @@ pub enum TypeKind {
     Record(indexmap::IndexMap<Ident, Type>),
     /// A function type with parameters and a return type.
     Fn(Vec<Type>, Box<Type>),
-    /// An intersection type, representing a type that satisfies multiple constraints.
-    Intersection {
-        /// The left-hand side type in the intersection.
-        lhs: Box<Type>,
-        /// The right-hand side type in the intersection.
-        rhs: Box<Type>,
-    },
-    /// A union type, representing a type that can be one of several alternatives.
-    Union {
-        /// The left-hand side type in the union.
-        lhs: Box<Type>,
-        /// The right-hand side type in the union.
-        rhs: Box<Type>,
-    },
 }
 
 /// Enumeration of primitive types.
@@ -422,6 +432,13 @@ pub enum PatternKind {
     Or {
         lhs: Box<Pattern>,
         rhs: Box<Pattern>,
+    },
+    /// A constructor pattern (e.g., `Circle(r)` or `Point`).
+    Constructor {
+        /// The constructor name.
+        name: Ident,
+        /// The payload pattern. `Rectangle(w, h)` has a tuple payload.
+        payload: Option<Box<Pattern>>,
     },
     /// A rest pattern.
     Rest,

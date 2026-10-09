@@ -245,6 +245,15 @@ impl Walker {
         match &item.kind {
             ItemKind::Import(import_tree) => self.walk_import_tree(visitor, import_tree)?,
             ItemKind::TypeAlias(type_alias) => self.walk_type_alias(visitor, type_alias)?,
+            ItemKind::TypeDecl(type_decl) => {
+                self.walk_ident(visitor, &type_decl.name)?;
+                for variant in &type_decl.variants {
+                    self.walk_ident(visitor, &variant.name)?;
+                    if let Some(payload) = &variant.payload {
+                        self.walk_type(visitor, payload)?;
+                    }
+                }
+            }
             ItemKind::Definition(definition) => self.walk_definition(visitor, definition)?,
         }
         if let WalkOrder::PostOrder = self.order {
@@ -363,14 +372,6 @@ impl Walker {
                     self.walk_type(visitor, param)?;
                 }
                 self.walk_type(visitor, return_type)?;
-            }
-            crate::TypeKind::Intersection { lhs, rhs } => {
-                self.walk_type(visitor, lhs)?;
-                self.walk_type(visitor, rhs)?;
-            }
-            crate::TypeKind::Union { lhs, rhs } => {
-                self.walk_type(visitor, lhs)?;
-                self.walk_type(visitor, rhs)?;
             }
         }
 
