@@ -245,7 +245,7 @@ fn comment<'src>(lex: &mut logos::Lexer<'src, Token<'src>>) -> Option<&'src str>
     // Scan until EOL or EOI.
     let end = start + remainder.find("\n").unwrap_or(remainder.len());
     lex.bump(end - start);
-    Some(&lex.source()[start..end].trim_start())
+    Some(lex.source()[start..end].trim_start())
 }
 
 #[cfg(test)]

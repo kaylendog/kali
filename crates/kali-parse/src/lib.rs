@@ -139,7 +139,7 @@ where
         .labelled("primitive type");
 
         // named ::= ident
-        let named = ident.clone().map(TypeKind::Named).labelled("named type");
+        let named = ident.map(TypeKind::Named).labelled("named type");
 
         // tuple ::= (ty (, ty)*)
         let tuple = ty
@@ -160,7 +160,6 @@ where
 
         // record ::= { ident : ty (, ident : ty)* }
         let record = ident
-            .clone()
             .then_ignore(just(Token::SymColon))
             .then(ty.clone())
             .separated_by(just(Token::SymComma))
@@ -189,7 +188,6 @@ where
     let pattern = recursive(|pattern| {
         // literal ::= literal_kind
         let atom_literal = literal_kind
-            .clone()
             .map(PatternKind::Literal)
             .labelled("literal pattern");
 
@@ -214,7 +212,6 @@ where
             })
             .delimited_by(just(Token::SymLParen), just(Token::SymRParen));
         let atom_constructor = constructor
-            .clone()
             .then(constructor_payload.or_not())
             .map(|(name, payload)| PatternKind::Constructor {
                 name,
@@ -223,10 +220,7 @@ where
             .labelled("constructor pattern");
 
         // variable ::= ident
-        let atom_variable = ident
-            .clone()
-            .map(PatternKind::Var)
-            .labelled("variable pattern");
+        let atom_variable = ident.map(PatternKind::Var).labelled("variable pattern");
 
         // wildcard ::= _
         let atom_wildcard = just(Token::SymWildcard)
@@ -246,7 +240,6 @@ where
 
         // record ::= { ident : pattern (, ident : pattern)* }
         let atom_record = ident
-            .clone()
             .then_ignore(just(Token::SymColon))
             .then(pattern.clone())
             .separated_by(just(Token::SymComma))
@@ -323,7 +316,6 @@ where
     let destructor = recursive(|destructor| {
         // variable ::= ident
         let atom_variable = ident
-            .clone()
             .map(DestructorKind::Var)
             .labelled("variable destructor");
 
@@ -340,7 +332,6 @@ where
 
         // record_item := ident (: destructor)?
         let atom_record_item = ident
-            .clone()
             .then(
                 just(Token::SymColon)
                     .ignore_then(destructor.clone())
@@ -376,15 +367,11 @@ where
     let expr = recursive(|expr| {
         // literal ::= literal_kind
         let atom_literal = literal_kind
-            .clone()
             .map(ExprKind::Literal)
             .labelled("literal expression");
 
         // variable ::= ident
-        let atom_variable = ident
-            .clone()
-            .map(ExprKind::Var)
-            .labelled("variable expression");
+        let atom_variable = ident.map(ExprKind::Var).labelled("variable expression");
 
         // tuple ::= (expr (, expr)*)
         let atom_tuple = expr
@@ -424,7 +411,7 @@ where
             .map(|((condition, body), otherwise)| ExprKind::Conditional {
                 condition: Box::new(condition),
                 body: Box::new(body),
-                otherwise: otherwise.map(|otherwise| Box::new(otherwise)),
+                otherwise: otherwise.map(Box::new),
             })
             .labelled("if expression");
 
@@ -654,7 +641,6 @@ where
         })
         .delimited_by(just(Token::SymLParen), just(Token::SymRParen));
     let variant = constructor
-        .clone()
         .then(variant_payload.or_not())
         .map_with(|(name, payload), e| Variant {
             name,
@@ -663,7 +649,7 @@ where
         })
         .labelled("variant");
     let item_type_decl = just(Token::KeywordType)
-        .ignore_then(ident.clone())
+        .ignore_then(ident)
         .then_ignore(just(Token::OpAssign))
         .then(
             just(Token::OpBitwiseOr).or_not().ignore_then(
@@ -684,7 +670,7 @@ where
 
     // item_type_alias ::= type ident = ty
     let item_type_alias = just(Token::KeywordType)
-        .ignore_then(ident.clone())
+        .ignore_then(ident)
         .then_ignore(just(Token::OpAssign))
         .then(ty.clone())
         .map(|(name, ty)| ItemKind::TypeAlias(TypeAlias { name, ty }))
@@ -695,14 +681,12 @@ where
         .ignore_then(recursive(|import_tree| {
             // item ::= ident (as ident)?
             let item = ident
-                .clone()
-                .then(just(Token::KeywordAs).ignore_then(ident.clone()).or_not())
+                .then(just(Token::KeywordAs).ignore_then(ident).or_not())
                 .map(|(name, alias)| ImportTreeKind::Item { name, alias })
                 .labelled("import item");
 
             // segment ::= ident :: import_tree
             let segment = ident
-                .clone()
                 .then_ignore(just(Token::OpCons))
                 .then(import_tree.clone())
                 .map(|(name, child)| ImportTreeKind::Segment {
