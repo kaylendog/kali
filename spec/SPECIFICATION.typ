@@ -75,7 +75,7 @@ Kali takes inspiration from a variety of existing programming languages, includi
 
 === Identifiers
 
-Identifiers are any run of word characters, including Unicode letters, and underscores. Keywords and primitive type names are reserved.
+Identifiers are any run of word characters, including Unicode letters, and underscores. Keywords and primitive type names are reserved. An identifier that starts with an uppercase letter names a constructor, see @sum-types; everything else is a variable.
 
 ```kali
 let add = a b -> a + b
@@ -214,7 +214,7 @@ The unit type is a special case of the tuple type, with no elements.
 let unit = ()
 ```
 
-==== Sum Types
+==== Sum Types <sum-types>
 
 Sum types are a composite data type that can hold one of several different values. They are defined using the `|` syntax, with each value separated by a pipe.
 
@@ -231,7 +231,19 @@ sum_type =  sum_type_variant ("|" sum_type_variant)*
 sum_type_variant = type ("(" type ("," type)* ")")
 ```
 
-#status[Named constructors are not implemented. The parser currently reads `a | b` as a structural union of two types and `a & b` as an intersection, TypeScript style, with `|` binding tighter than `&`. Whether Kali keeps structural unions, adds constructors, or both, is an open decision.]
+Each variant is a constructor taking one payload: `Circle` is a function from `int` to `Shape`, `Rectangle` takes the tuple `(int, int)`, and a variant with no payload is a value of the type. Constructors are applied like any function. A declaration may span lines, with each variant on its own line after a `|`, and a declaration whose only variant is a bare constructor, such as `type Foo = Bar`, is a one-variant sum type rather than an alias.
+
+```kali
+type Shape =
+  | Circle(int)
+  | Rectangle(int, int)
+  | Point
+
+let circle = Circle 3
+let rect = Rectangle (2, 4)
+```
+
+#status[Record variants are not parsed. Kali has no structural union or intersection types: every sum type is declared and matched by name.]
 
 ==== Arrays
 
@@ -379,6 +391,7 @@ The available patterns are:
   `[]`, [the empty array],
   `p :: q`, [a non-empty array, as its head and tail],
   `p | q`, [either pattern, an or-pattern],
+  `Circle(p)`, `Point`, [a constructor, with its payload matched by `p`],
 )
 
 Matching on a sum type:
@@ -394,7 +407,7 @@ let area = shape -> match shape {
 
 Pattern matching in Kali is exhaustive: the compiler will warn if not all possible cases are covered, unless a catch-all `_` pattern is provided.
 
-#status[Constructor patterns such as `Circle(r)` depend on sum types, see above. Exhaustiveness checking is not implemented.]
+#status[Exhaustiveness checking is not implemented.]
 
 == Functions
 
