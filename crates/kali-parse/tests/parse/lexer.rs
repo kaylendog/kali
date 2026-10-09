@@ -34,6 +34,26 @@ fn integers() {
 }
 
 #[test]
+fn floats() {
+    assert_eq!(
+        tokens("0.0 3.14 1_000.000_001"),
+        vec![
+            Token::LitFloat(0.0),
+            Token::LitFloat(3.14),
+            Token::LitFloat(1_000.000_001),
+        ]
+    );
+    assert_eq!(
+        tokens("1e10 2E-5 3.14e+2"),
+        vec![
+            Token::LitFloat(1e10),
+            Token::LitFloat(2e-5),
+            Token::LitFloat(3.14e2),
+        ]
+    );
+}
+
+#[test]
 fn integer_overflow_is_an_error() {
     assert!(matches!(tokens("9223372036854775808")[0], Token::Error(_)));
     assert!(matches!(
@@ -202,7 +222,5 @@ fn whitespace_and_newlines() {
 #[test]
 fn invalid_characters_are_errors() {
     assert!(matches!(tokens("$")[0], Token::Error(_)));
-    assert!(matches!(tokens("10.5")[1], Token::Error(_)));
     rejects("let x = $");
-    rejects("let x = 10.5");
 }

@@ -110,8 +110,7 @@ where
         select! {
             Token::LitBool(value) => LiteralKind::Bool(value),
             Token::LitInteger(value) => LiteralKind::Integer(value),
-            // TODO: Floats
-            // Token::LitFloat(value) => LiteralKind::Float(value),
+            Token::LitFloat(value) => LiteralKind::Float(value),
             Token::LitUnit => LiteralKind::Unit,
         }
         .labelled("literal"),
@@ -758,6 +757,7 @@ fn ends_item(token: &Token) -> bool {
         token,
         Token::Ident(_)
             | Token::LitInteger(_)
+            | Token::LitFloat(_)
             | Token::LitBool(_)
             | Token::LitUnit
             | Token::LitString(_)

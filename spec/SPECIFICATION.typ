@@ -138,14 +138,12 @@ let mask = 0xff
 
 Floats are numbers with a decimal point, and can be positive or negative.
 
-```kali-planned
+```kali
 let x = 10.5
 let y = -5.5
 ```
 
 Kali uses the IEEE 754 standard for floating point arithmetic.
-
-#status[The lexer has no float literal rule yet, so float literals are a parse error.]
 
 ==== Booleans
 

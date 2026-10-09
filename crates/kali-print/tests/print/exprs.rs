@@ -7,6 +7,7 @@ fn literals() {
     assert_round_trip("let a = 0xff\nlet b = 1_000", "let a = 255\nlet b = 1000\n");
     // A negative literal is negation applied to a literal.
     assert_fixed("let a = -5\n");
+    assert_fixed("let a = -1.5\n");
 }
 
 #[test]

@@ -3,10 +3,11 @@ use crate::common::{assert_eq, parses, rejects, sexp};
 #[test]
 fn literals() {
     assert_eq!(sexp("42"), "42");
+    assert_eq!(sexp("0xff"), "255");
+    assert_eq!(sexp("10.5"), "10.5");
     assert_eq!(sexp("true"), "true");
     assert_eq!(sexp("\"hi\""), "\"hi\"");
     assert_eq!(sexp("()"), "()");
-    rejects("let x = 10.5");
 }
 
 #[test]

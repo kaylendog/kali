@@ -81,6 +81,7 @@ fn render(expr: &Expr, module: &Module) -> String {
     match &expr.kind {
         ExprKind::Var(ident) => name(ident),
         ExprKind::Literal(LiteralKind::Integer(value)) => value.to_string(),
+        ExprKind::Literal(LiteralKind::Float(value)) => value.to_string(),
         ExprKind::Literal(LiteralKind::Bool(value)) => value.to_string(),
         ExprKind::Literal(LiteralKind::String(key)) => format!("{:?}", module.cache.resolve(key)),
         ExprKind::Literal(LiteralKind::Unit) => "()".into(),

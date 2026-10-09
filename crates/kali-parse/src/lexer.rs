@@ -143,6 +143,10 @@ pub enum Token<'src> {
     #[regex("0d[0-9][0-9_]*", |lex| prefixed_integer(lex))]
     #[strum(to_string = "integer literal")]
     LitInteger(i64),
+    #[regex("[0-9][0-9_]*\\.[0-9][0-9_]*([eE][+-]?[0-9]+)?", |lex| lex.slice().replace('_', "").parse().ok().filter(|v: &f64| v.is_finite()))]
+    #[regex("[0-9][0-9_]*([eE][+-]?[0-9]+)", |lex| lex.slice().replace('_', "").parse().ok().filter(|v: &f64| v.is_finite()))]
+    #[strum(to_string = "float literal")]
+    LitFloat(f64),
     #[token("true", |_| true)]
     #[token("false", |_| false)]
     #[strum(to_string = "boolean literal")]
