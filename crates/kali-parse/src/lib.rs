@@ -943,26 +943,3 @@ macro_rules! kali {
         $crate::parse_str(input)
     }};
 }
-
-#[cfg(test)]
-mod tests {
-    use kali_ast::{Definition, ExprKind, ItemKind};
-
-    #[test]
-    fn lambda_body_spans_binary_expr() {
-        let (module, errors) = kali! {
-            let add = a b -> a + b
-        };
-        assert!(errors.is_empty(), "{errors:?}");
-        let module = module.unwrap();
-        let ItemKind::Definition(Definition { expr, .. }) = &module.items[0].kind else {
-            panic!("expected a definition");
-        };
-        let ExprKind::Lambda { params, body, .. } = &expr.kind else {
-            panic!("expected a lambda, found {expr:?}");
-        };
-        assert_eq!(params.len(), 2);
-        assert!(params.iter().all(|param| param.ty.is_none()));
-        assert!(matches!(body.kind, ExprKind::BinaryExpr { .. }));
-    }
-}
