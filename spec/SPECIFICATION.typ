@@ -138,7 +138,7 @@ let mask = 0xff
 
 Floats are numbers with a decimal point, and can be positive or negative.
 
-```kali
+```kali-planned
 let x = 10.5
 let y = -5.5
 ```
@@ -268,7 +268,7 @@ field = identifier ":" type
 
 Fields on a record can be accessed using the `.` operator.
 
-```kali
+```kali-planned
 let point = { x: 10, y: 20 }
 let x = point.x
 ```
@@ -316,7 +316,7 @@ Both the `if` and `else` branches must return a value of the same type.
 
 You can chain multiple conditions using `else if`:
 
-```kali
+```kali-planned
 let sign = if x > 0 {
   "positive"
 } else if x < 0 {
@@ -337,7 +337,7 @@ Pattern matching in Kali is inspired by OCaml and Rust. It allows you to match v
 The basic syntax is as follows:
 
 ```kali
-match value {
+let result = match value {
   | pattern1 -> expr1
   | pattern2 -> expr2
   | _ -> expr_default
@@ -464,7 +464,7 @@ Kali uses an import/export system that allows code to be organized into reusable
 
 To make functions, types, or values available outside a module, use the `export` keyword:
 
-```kali
+```kali-planned
 export let pi = 3
 
 export let area_circle = (r: float) -> pi * r * r
