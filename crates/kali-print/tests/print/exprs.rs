@@ -13,6 +13,10 @@ fn literals() {
 #[test]
 fn tuples_and_lists() {
     assert_fixed("let t = (1, 2, 3)\nlet n = ((1, 2), 3)\nlet l = [1, [2, 3], []]\n");
+    assert_round_trip(
+        "let t = (1, 2,)\nlet l = [1,]",
+        "let t = (1, 2)\nlet l = [1]\n",
+    );
 }
 
 #[test]

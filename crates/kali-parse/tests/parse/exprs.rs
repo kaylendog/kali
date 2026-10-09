@@ -90,6 +90,10 @@ fn tuples_and_lists() {
     assert_eq!(sexp("(1)"), "1");
     assert_eq!(sexp("[1, [2], []]"), "(list 1 (list 2) (list ))");
     assert_eq!(sexp("[]"), "(list )");
+    assert_eq!(sexp("(1, 2,)"), "(tuple 1 2)");
+    assert_eq!(sexp("[1,]"), "(list 1)");
+    rejects("let x = (,)");
+    rejects("let x = (1,)");
 }
 
 #[test]

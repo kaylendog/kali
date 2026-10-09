@@ -378,20 +378,22 @@ where
         // variable ::= ident
         let atom_variable = ident.map(ExprKind::Var).labelled("variable expression");
 
-        // tuple ::= (expr (, expr)*)
+        // tuple ::= (expr (, expr)* ,?)
         let atom_tuple = expr
             .clone()
             .separated_by(just(Token::SymComma))
             .at_least(2)
+            .allow_trailing()
             .collect::<Vec<_>>()
             .delimited_by(just(Token::SymLParen), just(Token::SymRParen))
             .map(ExprKind::Tuple)
             .labelled("tuple expression");
 
-        // list ::= [expr (, expr)*] | []
+        // list ::= [expr (, expr)* ,?] | []
         let atom_list = expr
             .clone()
             .separated_by(just(Token::SymComma))
+            .allow_trailing()
             .collect::<Vec<_>>()
             .delimited_by(just(Token::SymLBracket), just(Token::SymRBracket))
             .or(just(Token::SymArray).to(vec![]))
