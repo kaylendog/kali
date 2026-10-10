@@ -1,119 +1,390 @@
-use std::{
-    collections::BTreeMap,
-    io::{self, Write},
-};
+//! Width-aware printer built on Wadler-style documents from the `pretty` crate. Each node builds
+//! a `Doc`; `render` lays it out against the configured width.
+//!
+//! Line breaks are only placed where the parser's automatic `;` insertion cannot misread them:
+//! after an operator, a comma, an opening bracket or `->`. Never between a call and its arguments.
+
+use std::{borrow::Cow, collections::BTreeMap, io};
 
 use kali_ast::{
     BinaryOpKind, Comment, CommentKind, Definition, Destructor, DestructorKind, Expr, ExprKind,
     Ident, ImportTree, ImportTreeKind, Item, ItemKind, LambdaParam, LiteralKind, MatchArm, Module,
-    NodeId, Pattern, PatternKind, PrimitiveTypeKind, Type, TypeAlias, TypeDecl, TypeKind,
+    NodeId, Pattern, PatternKind, PrimitiveTypeKind, Type, TypeAlias, TypeDecl, TypeKind, Variant,
     Visibility,
 };
+use pretty::{RcDoc, Render, RenderAnnotated};
 
-use crate::{error::Result, pass::Comments};
+use crate::pass::Comments;
 
-/// Output buffer plus the state needed to print a module: indentation, the string interner, and
-/// the comments attached to each node.
+type Doc = RcDoc<'static, ()>;
+
+/// Settings for pretty-printing.
+#[derive(Debug, Clone, Copy)]
+pub struct Settings {
+    /// Columns before a group breaks.
+    pub width: usize,
+    /// Columns per indentation level. With `tabs`, also the width one tab counts for.
+    pub indent: usize,
+    /// Indent with tabs instead of spaces.
+    pub tabs: bool,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            width: 100,
+            indent: 4,
+            tabs: true,
+        }
+    }
+}
+
+/// State needed to build a module's document: the interner, the source for blank-line
+/// preservation, and the comments attached to each node.
 pub struct Context<'a> {
-    /// The current indent depth.
-    depth: usize,
-    /// The buffer to which output will be written.
-    buf: &'a mut (dyn Write + 'a),
-    /// Interner for identifiers, strings and comment contents.
+    settings: Settings,
     cache: &'a lasso::Rodeo,
-    /// Original source, used to preserve blank lines between items and comments.
     src: &'a str,
     /// Comments attached to nodes. Removed as they are printed.
     pub(crate) comments: BTreeMap<NodeId, Comments>,
 }
 
 impl<'a> Context<'a> {
-    pub fn new(buf: &'a mut dyn Write, cache: &'a lasso::Rodeo, src: &'a str) -> Context<'a> {
+    pub fn new(
+        settings: Settings,
+        cache: &'a lasso::Rodeo,
+        src: &'a str,
+        comments: BTreeMap<NodeId, Comments>,
+    ) -> Context<'a> {
         Context {
-            depth: 0,
-            buf,
+            settings,
             cache,
             src,
-            comments: BTreeMap::new(),
+            comments,
         }
     }
 
-    /// Writes the separator between two things that were at `from..to` in the source: a space on
-    /// the same line, a newline, or one blank line for two or more. `at_least` forces a minimum
-    /// number of newlines regardless of the source.
-    fn gap(&mut self, from: usize, to: usize, at_least: usize) -> io::Result<()> {
+    fn indent(&self) -> isize {
+        self.settings.indent as isize
+    }
+
+    fn text(&self, text: impl Into<Cow<'static, str>>) -> Doc {
+        RcDoc::text(text)
+    }
+
+    fn resolve(&self, key: &lasso::Spur) -> Doc {
+        RcDoc::text(self.cache.resolve(key).to_string())
+    }
+
+    /// `open` items `close`, on one line if it fits, else one item per line with a trailing
+    /// comma. `pad` puts a space inside the brackets when flat, as in `{ x: int }`.
+    fn delimited(
+        &self,
+        open: &'static str,
+        close: &'static str,
+        pad: bool,
+        items: Vec<Doc>,
+    ) -> Doc {
+        if items.is_empty() {
+            return self.text(open).append(self.text(close));
+        }
+        let edge = || if pad { RcDoc::line() } else { RcDoc::line_() };
+        self.text(open)
+            .append(
+                edge()
+                    .append(RcDoc::intersperse(
+                        items,
+                        self.text(",").append(RcDoc::line()),
+                    ))
+                    .append(self.text(",").flat_alt(RcDoc::nil()))
+                    .nest(self.indent()),
+            )
+            .append(edge())
+            .append(self.text(close))
+            .group()
+    }
+
+    /// `{` body `}` with the body always on its own lines.
+    fn block(&self, body: Doc) -> Doc {
+        self.text("{")
+            .append(RcDoc::hardline().append(body).nest(self.indent()))
+            .append(RcDoc::hardline())
+            .append(self.text("}"))
+    }
+
+    /// The right-hand side of `=` or `->`: an expression that breaks anyway, or one that can
+    /// break inside its own brackets, hugs the operator. Anything else may move to the next
+    /// line, indented.
+    fn rhs(&self, expr: &Expr, doc: Doc) -> Doc {
+        let bracketed = matches!(
+            expr.kind,
+            ExprKind::Tuple(_) | ExprKind::List(_) | ExprKind::Record { .. }
+        );
+        if bracketed || has_hard_break(expr) {
+            RcDoc::space().append(doc)
+        } else {
+            RcDoc::line().append(doc).nest(self.indent()).group()
+        }
+    }
+
+    /// The separator between two things that were at `from..to` in the source: a space on the
+    /// same line, a newline, or one blank line for two or more. `at_least` forces a minimum.
+    fn gap(&self, from: usize, to: usize, at_least: usize) -> Doc {
         let newlines = self
             .src
             .get(from..to)
             .map_or(1, |text| text.matches('\n').count());
         match newlines.max(at_least) {
-            0 => write!(self, " "),
-            1 => self.newline(),
-            _ => {
-                writeln!(self)?;
-                self.newline()
-            }
+            0 => RcDoc::space(),
+            1 => RcDoc::hardline(),
+            _ => RcDoc::hardline().append(RcDoc::hardline()),
         }
-    }
-
-    /// Resolves an interned string. Borrows the interner, not the context.
-    fn resolve(&self, key: &lasso::Spur) -> &'a str {
-        self.cache.resolve(key)
-    }
-
-    /// Increases the current indentation depth by one.
-    pub fn increase(&mut self) {
-        self.depth += 1;
-    }
-
-    /// Decreases the current indentation depth by one.
-    pub fn decrease(&mut self) {
-        self.depth -= 1;
-    }
-
-    /// Writes a newline followed by indentation corresponding to the current depth.
-    pub fn newline(&mut self) -> io::Result<()> {
-        writeln!(self)?;
-        for _ in 0..self.depth {
-            write!(self, "\t")?;
-        }
-        Ok(())
-    }
-
-    /// Writes `items` between `open` and `close`, with `sep` between consecutive items.
-    pub fn write_many<T>(
-        &mut self,
-        open: &str,
-        close: &str,
-        sep: &str,
-        items: impl IntoIterator<Item = T>,
-        f: impl Fn(&mut Context, T) -> Result<()>,
-    ) -> Result<()> {
-        write!(self, "{open}")?;
-        for (index, item) in items.into_iter().enumerate() {
-            if index > 0 {
-                write!(self, "{sep}")?;
-            }
-            f(self, item)?;
-        }
-        write!(self, "{close}")?;
-        Ok(())
     }
 }
 
-impl Write for Context<'_> {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.buf.write(buf)
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        self.buf.flush()
+/// Whether `expr` prints with a hard line break, so no group containing it can be laid out flat.
+/// `match` and `if` always break; anything else breaks if an operand does.
+fn has_hard_break(expr: &Expr) -> bool {
+    match &expr.kind {
+        ExprKind::Match { .. } | ExprKind::Conditional { .. } => true,
+        ExprKind::Lambda { body, .. } => has_hard_break(body),
+        ExprKind::UnaryExpr { expr, .. } => has_hard_break(expr),
+        ExprKind::BinaryExpr { lhs, rhs, .. } => has_hard_break(lhs) || has_hard_break(rhs),
+        ExprKind::Call {
+            function,
+            arguments,
+        } => has_hard_break(function) || arguments.iter().any(has_hard_break),
+        ExprKind::Tuple(exprs) | ExprKind::List(exprs) => exprs.iter().any(has_hard_break),
+        ExprKind::Record { fields } => fields.values().any(has_hard_break),
+        ExprKind::Literal(_) | ExprKind::Var(_) => false,
     }
 }
 
-/// Trait for types that can be printed to a writer via a `Context`.
-pub trait Print {
-    fn print(&self, ctx: &mut Context) -> Result<()>;
+/// Implemented by AST nodes that can be pretty-printed.
+pub trait PrettyPrint {
+    fn pretty_print(&self, ctx: &mut Context) -> Doc;
+}
+
+impl<T: PrettyPrint> PrettyPrint for Box<T> {
+    fn pretty_print(&self, ctx: &mut Context) -> Doc {
+        self.as_ref().pretty_print(ctx)
+    }
+}
+
+impl PrettyPrint for Ident {
+    fn pretty_print(&self, ctx: &mut Context) -> Doc {
+        ctx.resolve(&self.key)
+    }
+}
+
+impl PrettyPrint for Comment {
+    fn pretty_print(&self, ctx: &mut Context) -> Doc {
+        let marker = match self.kind {
+            CommentKind::Single => "//",
+            CommentKind::Doc => "///",
+        };
+        let contents = ctx.cache.resolve(&self.contents);
+        if contents.is_empty() {
+            ctx.text(marker)
+        } else {
+            ctx.text(format!("{marker} {contents}"))
+        }
+    }
+}
+
+// --- Module and items ---
+
+impl PrettyPrint for Module {
+    fn pretty_print(&self, ctx: &mut Context) -> Doc {
+        // Source offset where the last printed thing ended. `None` until something is printed,
+        // so blank lines at the top of the file are dropped.
+        let mut last_end: Option<usize> = None;
+        let mut out = RcDoc::nil();
+        let mut place = |ctx: &Context, out: Doc, doc: Doc, start: usize, end: usize, at_least| {
+            let gap = match last_end {
+                Some(from) => ctx.gap(from, start, at_least),
+                None => RcDoc::nil(),
+            };
+            last_end = Some(end);
+            out.append(gap).append(doc)
+        };
+
+        for item in &self.items {
+            let comments = ctx.comments.remove(&item.id).unwrap_or_default();
+            for comment in &comments.leading {
+                let doc = comment.pretty_print(ctx);
+                out = place(ctx, out, doc, comment.span.start, comment.span.end, 0);
+            }
+            // Line ends separate items, so an item always starts a new line.
+            let doc = item.pretty_print(ctx);
+            out = place(ctx, out, doc, item.span.start, item.span.end, 1);
+            // Dangling comments have no slot of their own yet, so they follow the item.
+            for comment in &comments.dangling {
+                out = out
+                    .append(RcDoc::hardline())
+                    .append(comment.pretty_print(ctx));
+            }
+            for comment in &comments.trailing {
+                let doc = comment.pretty_print(ctx);
+                out = place(ctx, out, doc, comment.span.start, comment.span.end, 0);
+            }
+        }
+        // With no items, the comments pass has nothing to attach the comments to.
+        if self.items.is_empty() {
+            for comment in self.comments.values() {
+                let doc = comment.pretty_print(ctx);
+                out = place(ctx, out, doc, comment.span.start, comment.span.end, 0);
+            }
+        }
+        if last_end.is_some() {
+            out = out.append(RcDoc::hardline());
+        }
+        out
+    }
+}
+
+impl PrettyPrint for Item {
+    fn pretty_print(&self, ctx: &mut Context) -> Doc {
+        let doc = match &self.kind {
+            ItemKind::Definition(definition) => definition.pretty_print(ctx),
+            ItemKind::TypeAlias(alias) => alias.pretty_print(ctx),
+            ItemKind::TypeDecl(decl) => decl.pretty_print(ctx),
+            ItemKind::Import(import) => ctx.text("import ").append(import.pretty_print(ctx)),
+        };
+        if self.visibility == Visibility::Exported {
+            ctx.text("export ").append(doc)
+        } else {
+            doc
+        }
+    }
+}
+
+impl PrettyPrint for Definition {
+    fn pretty_print(&self, ctx: &mut Context) -> Doc {
+        let expr = self.expr.pretty_print(ctx);
+        ctx.text("let ")
+            .append(self.name.pretty_print(ctx))
+            .append(ctx.text(" ="))
+            .append(ctx.rhs(&self.expr, expr))
+    }
+}
+
+impl PrettyPrint for TypeAlias {
+    fn pretty_print(&self, ctx: &mut Context) -> Doc {
+        ctx.text("type ")
+            .append(self.name.pretty_print(ctx))
+            .append(ctx.text(" = "))
+            .append(self.ty.pretty_print(ctx))
+    }
+}
+
+impl PrettyPrint for TypeDecl {
+    fn pretty_print(&self, ctx: &mut Context) -> Doc {
+        // `type S = A | B` when it fits, else one variant per line, each after a leading `|`.
+        let variants = self
+            .variants
+            .iter()
+            .enumerate()
+            .map(|(index, variant)| {
+                let pipe = if index == 0 {
+                    ctx.text("| ").flat_alt(RcDoc::nil())
+                } else {
+                    ctx.text("| ")
+                };
+                RcDoc::line().append(pipe).append(variant.pretty_print(ctx))
+            })
+            .collect::<Vec<_>>();
+        ctx.text("type ")
+            .append(self.name.pretty_print(ctx))
+            .append(ctx.text(" ="))
+            .append(RcDoc::concat(variants).nest(ctx.indent()).group())
+    }
+}
+
+impl PrettyPrint for Variant {
+    fn pretty_print(&self, ctx: &mut Context) -> Doc {
+        // `Rectangle(int, int)` is one tuple payload, printed without double parens.
+        let payload = match self.payload.as_ref().map(|ty| &ty.kind) {
+            None => RcDoc::nil(),
+            Some(TypeKind::Tuple(types)) => {
+                let types = types.iter().map(|ty| ty.pretty_print(ctx)).collect();
+                ctx.delimited("(", ")", false, types)
+            }
+            Some(_) => {
+                let ty = self.payload.as_ref().unwrap().pretty_print(ctx);
+                ctx.delimited("(", ")", false, vec![ty])
+            }
+        };
+        self.name.pretty_print(ctx).append(payload)
+    }
+}
+
+impl PrettyPrint for ImportTree {
+    fn pretty_print(&self, ctx: &mut Context) -> Doc {
+        match &self.kind {
+            ImportTreeKind::Item { name, alias } => {
+                let name = name.pretty_print(ctx);
+                match alias {
+                    Some(alias) => name
+                        .append(ctx.text(" as "))
+                        .append(alias.pretty_print(ctx)),
+                    None => name,
+                }
+            }
+            // Rust style: `std::io::{read, write}`, no spaces around `::` or inside braces.
+            ImportTreeKind::Segment { name, child } => name
+                .pretty_print(ctx)
+                .append(ctx.text("::"))
+                .append(child.pretty_print(ctx)),
+            ImportTreeKind::Glob => ctx.text("*"),
+            ImportTreeKind::List(trees) => {
+                let trees = trees.iter().map(|tree| tree.pretty_print(ctx)).collect();
+                ctx.delimited("{", "}", false, trees)
+            }
+        }
+    }
+}
+
+// --- Types ---
+
+impl PrettyPrint for Type {
+    fn pretty_print(&self, ctx: &mut Context) -> Doc {
+        match &self.kind {
+            TypeKind::Primitive(primitive) => ctx.text(match primitive {
+                PrimitiveTypeKind::Integer => "int",
+                PrimitiveTypeKind::Float => "float",
+                PrimitiveTypeKind::Bool => "bool",
+                PrimitiveTypeKind::String => "string",
+                PrimitiveTypeKind::Unit => "()",
+            }),
+            TypeKind::Named(name) => name.pretty_print(ctx),
+            TypeKind::Tuple(types) => {
+                let types = types.iter().map(|ty| ty.pretty_print(ctx)).collect();
+                ctx.delimited("(", ")", false, types)
+            }
+            TypeKind::List(ty) => ctx
+                .text("[")
+                .append(ty.pretty_print(ctx))
+                .append(ctx.text("]")),
+            TypeKind::Record(fields) => {
+                let fields = fields
+                    .iter()
+                    .map(|(name, ty)| {
+                        name.pretty_print(ctx)
+                            .append(ctx.text(": "))
+                            .append(ty.pretty_print(ctx))
+                    })
+                    .collect();
+                ctx.delimited("{", "}", true, fields)
+            }
+            TypeKind::Fn(params, ret) => {
+                let params = params.iter().map(|ty| ty.pretty_print(ctx)).collect();
+                ctx.delimited("(", ")", false, params)
+                    .append(ctx.text(" -> "))
+                    .append(ret.pretty_print(ctx))
+            }
+        }
+    }
 }
 
 // --- Precedence ---
@@ -178,437 +449,315 @@ fn pattern_precedence(pattern: &Pattern) -> (u8, Assoc) {
 }
 
 /// Prints `child`, parenthesised if its binding power is below `minimum`.
-fn print_child<T: Print>(ctx: &mut Context, child: &T, precedence: u8, minimum: u8) -> Result<()> {
+fn print_child<T: PrettyPrint>(ctx: &mut Context, child: &T, precedence: u8, minimum: u8) -> Doc {
+    let doc = child.pretty_print(ctx);
     if precedence < minimum {
-        write!(ctx, "(")?;
-        child.print(ctx)?;
-        write!(ctx, ")")?;
+        ctx.text("(").append(doc).append(ctx.text(")"))
     } else {
-        child.print(ctx)?;
-    }
-    Ok(())
-}
-
-// --- Module and items ---
-
-impl Print for Module {
-    fn print(&self, ctx: &mut Context) -> Result<()> {
-        // Source offset where the last printed thing ended. `None` until something is printed,
-        // so blank lines at the top of the file are dropped.
-        let mut last_end: Option<usize> = None;
-        let mut print_at =
-            |ctx: &mut Context, node: &dyn Print, start, end, at_least| -> Result<()> {
-                if let Some(from) = last_end {
-                    ctx.gap(from, start, at_least)?;
-                }
-                node.print(ctx)?;
-                last_end = Some(end);
-                Ok(())
-            };
-
-        for item in &self.items {
-            let comments = ctx.comments.remove(&item.id).unwrap_or_default();
-            for comment in &comments.leading {
-                print_at(ctx, comment, comment.span.start, comment.span.end, 0)?;
-            }
-            // Line ends separate items, so an item always starts a new line.
-            print_at(ctx, item, item.span.start, item.span.end, 1)?;
-            // Dangling comments have no slot of their own yet, so they follow the item.
-            for comment in &comments.dangling {
-                ctx.newline()?;
-                comment.print(ctx)?;
-            }
-            for comment in &comments.trailing {
-                print_at(ctx, comment, comment.span.start, comment.span.end, 0)?;
-            }
-        }
-        // With no items, the comments pass has nothing to attach the comments to.
-        if self.items.is_empty() {
-            for comment in self.comments.values() {
-                print_at(ctx, comment, comment.span.start, comment.span.end, 0)?;
-            }
-        }
-        if last_end.is_some() {
-            ctx.newline()?;
-        }
-        Ok(())
-    }
-}
-
-impl Print for Comment {
-    fn print(&self, ctx: &mut Context) -> Result<()> {
-        let marker = match self.kind {
-            CommentKind::Single => "//",
-            CommentKind::Doc => "///",
-        };
-        let contents = ctx.resolve(&self.contents);
-        if contents.is_empty() {
-            write!(ctx, "{marker}")?;
-        } else {
-            write!(ctx, "{marker} {contents}")?;
-        }
-        Ok(())
-    }
-}
-
-impl Print for Ident {
-    fn print(&self, ctx: &mut Context) -> Result<()> {
-        let name = ctx.resolve(&self.key);
-        Ok(write!(ctx, "{name}")?)
-    }
-}
-
-impl Print for Item {
-    fn print(&self, ctx: &mut Context) -> Result<()> {
-        if self.visibility == Visibility::Exported {
-            write!(ctx, "export ")?;
-        }
-        match &self.kind {
-            ItemKind::Definition(definition) => definition.print(ctx),
-            ItemKind::TypeAlias(alias) => alias.print(ctx),
-            ItemKind::TypeDecl(decl) => decl.print(ctx),
-            ItemKind::Import(import) => {
-                write!(ctx, "import ")?;
-                import.print(ctx)
-            }
-        }
-    }
-}
-
-impl Print for Definition {
-    fn print(&self, ctx: &mut Context) -> Result<()> {
-        write!(ctx, "let ")?;
-        self.name.print(ctx)?;
-        write!(ctx, " = ")?;
-        self.expr.print(ctx)
-    }
-}
-
-impl Print for TypeAlias {
-    fn print(&self, ctx: &mut Context) -> Result<()> {
-        write!(ctx, "type ")?;
-        self.name.print(ctx)?;
-        write!(ctx, " = ")?;
-        self.ty.print(ctx)
-    }
-}
-
-impl Print for ImportTree {
-    fn print(&self, ctx: &mut Context) -> Result<()> {
-        match &self.kind {
-            ImportTreeKind::Item { name, alias } => {
-                name.print(ctx)?;
-                if let Some(alias) = alias {
-                    write!(ctx, " as ")?;
-                    alias.print(ctx)?;
-                }
-                Ok(())
-            }
-            ImportTreeKind::Segment { name, child } => {
-                name.print(ctx)?;
-                write!(ctx, " :: ")?;
-                child.print(ctx)
-            }
-            ImportTreeKind::Glob => Ok(write!(ctx, "*")?),
-            ImportTreeKind::List(trees) => {
-                ctx.write_many("{ ", " }", ", ", trees, |ctx, tree| tree.print(ctx))
-            }
-        }
-    }
-}
-
-// --- Types ---
-
-impl Print for Type {
-    fn print(&self, ctx: &mut Context) -> Result<()> {
-        match &self.kind {
-            TypeKind::Primitive(primitive) => {
-                let name = match primitive {
-                    PrimitiveTypeKind::Integer => "int",
-                    PrimitiveTypeKind::Float => "float",
-                    PrimitiveTypeKind::Bool => "bool",
-                    PrimitiveTypeKind::String => "string",
-                    PrimitiveTypeKind::Unit => "()",
-                };
-                Ok(write!(ctx, "{name}")?)
-            }
-            TypeKind::Named(name) => name.print(ctx),
-            TypeKind::Tuple(types) => {
-                ctx.write_many("(", ")", ", ", types, |ctx, ty| ty.print(ctx))
-            }
-            TypeKind::List(ty) => {
-                write!(ctx, "[")?;
-                ty.print(ctx)?;
-                Ok(write!(ctx, "]")?)
-            }
-            TypeKind::Record(fields) => {
-                ctx.write_many("{ ", " }", ", ", fields, |ctx, (name, ty)| {
-                    name.print(ctx)?;
-                    write!(ctx, ": ")?;
-                    ty.print(ctx)
-                })
-            }
-            TypeKind::Fn(params, ret) => {
-                ctx.write_many("(", ")", ", ", params, |ctx, ty| ty.print(ctx))?;
-                write!(ctx, " -> ")?;
-                ret.print(ctx)
-            }
-        }
-    }
-}
-
-impl Print for TypeDecl {
-    fn print(&self, ctx: &mut Context) -> Result<()> {
-        write!(ctx, "type ")?;
-        self.name.print(ctx)?;
-        write!(ctx, " =")?;
-        ctx.increase();
-        for variant in &self.variants {
-            ctx.newline()?;
-            write!(ctx, "| ")?;
-            variant.name.print(ctx)?;
-            // `Rectangle(int, int)` is one tuple payload, printed without double parens.
-            match variant.payload.as_ref().map(|ty| &ty.kind) {
-                None => {}
-                Some(TypeKind::Tuple(types)) => {
-                    ctx.write_many("(", ")", ", ", types, |ctx, ty| ty.print(ctx))?;
-                }
-                Some(_) => {
-                    write!(ctx, "(")?;
-                    variant.payload.as_ref().unwrap().print(ctx)?;
-                    write!(ctx, ")")?;
-                }
-            }
-        }
-        ctx.decrease();
-        Ok(())
+        doc
     }
 }
 
 // --- Patterns and destructors ---
 
-impl Print for LiteralKind {
-    fn print(&self, ctx: &mut Context) -> Result<()> {
+impl PrettyPrint for LiteralKind {
+    fn pretty_print(&self, ctx: &mut Context) -> Doc {
         match self {
-            LiteralKind::Integer(value) => write!(ctx, "{value}")?,
+            LiteralKind::Integer(value) => ctx.text(value.to_string()),
             // Debug keeps the decimal point so the literal lexes as a float again.
-            LiteralKind::Float(value) => write!(ctx, "{value:?}")?,
-            LiteralKind::Bool(value) => write!(ctx, "{value}")?,
-            LiteralKind::String(key) => {
-                let contents = ctx.resolve(key);
-                write!(ctx, "\"{contents}\"")?
-            }
-            LiteralKind::Unit => write!(ctx, "()")?,
+            LiteralKind::Float(value) => ctx.text(format!("{value:?}")),
+            LiteralKind::Bool(value) => ctx.text(value.to_string()),
+            LiteralKind::String(key) => ctx.text(format!("\"{}\"", ctx.cache.resolve(key))),
+            LiteralKind::Unit => ctx.text("()"),
         }
-        Ok(())
     }
 }
 
-impl Print for Pattern {
-    fn print(&self, ctx: &mut Context) -> Result<()> {
+impl PrettyPrint for Pattern {
+    fn pretty_print(&self, ctx: &mut Context) -> Doc {
         let (precedence, assoc) = pattern_precedence(self);
         let (lhs_min, rhs_min) = operand_minimums(precedence, assoc);
-        let print_operand = |ctx: &mut Context, pattern: &Pattern, minimum| {
+        let operand = |ctx: &mut Context, pattern: &Pattern, minimum| {
             print_child(ctx, pattern, pattern_precedence(pattern).0, minimum)
         };
         match &self.kind {
-            PatternKind::Literal(literal) => literal.print(ctx),
-            PatternKind::Var(name) => name.print(ctx),
-            PatternKind::Wildcard => Ok(write!(ctx, "_")?),
-            PatternKind::EmptyList => Ok(write!(ctx, "[]")?),
-            PatternKind::Rest => Ok(write!(ctx, "...")?),
+            PatternKind::Literal(literal) => literal.pretty_print(ctx),
+            PatternKind::Var(name) => name.pretty_print(ctx),
+            PatternKind::Wildcard => ctx.text("_"),
+            PatternKind::EmptyList => ctx.text("[]"),
+            PatternKind::Rest => ctx.text("..."),
             PatternKind::Constructor { name, payload } => {
-                name.print(ctx)?;
-                match payload.as_deref().map(|pattern| &pattern.kind) {
-                    None => Ok(()),
+                let payload = match payload.as_deref().map(|pattern| &pattern.kind) {
+                    None => RcDoc::nil(),
                     Some(PatternKind::Tuple(patterns)) => {
-                        ctx.write_many("(", ")", ", ", patterns, |ctx, pattern| pattern.print(ctx))
+                        let patterns = patterns.iter().map(|p| p.pretty_print(ctx)).collect();
+                        ctx.delimited("(", ")", false, patterns)
                     }
                     Some(_) => {
-                        write!(ctx, "(")?;
-                        payload.as_ref().unwrap().print(ctx)?;
-                        Ok(write!(ctx, ")")?)
+                        let pattern = payload.as_ref().unwrap().pretty_print(ctx);
+                        ctx.delimited("(", ")", false, vec![pattern])
                     }
-                }
+                };
+                name.pretty_print(ctx).append(payload)
             }
             PatternKind::Tuple(patterns) => {
-                ctx.write_many("(", ")", ", ", patterns, |ctx, pattern| pattern.print(ctx))
+                let patterns = patterns.iter().map(|p| p.pretty_print(ctx)).collect();
+                ctx.delimited("(", ")", false, patterns)
             }
             PatternKind::Record(fields) => {
-                ctx.write_many("{ ", " }", ", ", fields, |ctx, (name, pattern)| {
-                    name.print(ctx)?;
-                    write!(ctx, ": ")?;
-                    pattern.print(ctx)
-                })
+                let fields = fields
+                    .iter()
+                    .map(|(name, pattern)| {
+                        name.pretty_print(ctx)
+                            .append(ctx.text(": "))
+                            .append(pattern.pretty_print(ctx))
+                    })
+                    .collect();
+                ctx.delimited("{", "}", true, fields)
             }
-            PatternKind::Cons { lhs, rhs } => {
-                print_operand(ctx, lhs, lhs_min)?;
-                write!(ctx, " :: ")?;
-                print_operand(ctx, rhs, rhs_min)
-            }
-            PatternKind::Or { lhs, rhs } => {
-                print_operand(ctx, lhs, lhs_min)?;
-                write!(ctx, " | ")?;
-                print_operand(ctx, rhs, rhs_min)
-            }
+            PatternKind::Cons { lhs, rhs } => operand(ctx, lhs, lhs_min)
+                .append(ctx.text(" :: "))
+                .append(operand(ctx, rhs, rhs_min)),
+            PatternKind::Or { lhs, rhs } => operand(ctx, lhs, lhs_min)
+                .append(ctx.text(" | "))
+                .append(operand(ctx, rhs, rhs_min)),
         }
     }
 }
 
-impl Print for Destructor {
-    fn print(&self, ctx: &mut Context) -> Result<()> {
+impl PrettyPrint for Destructor {
+    fn pretty_print(&self, ctx: &mut Context) -> Doc {
         match &self.kind {
-            DestructorKind::Var(name) => name.print(ctx),
-            DestructorKind::Rest => Ok(write!(ctx, "...")?),
+            DestructorKind::Var(name) => name.pretty_print(ctx),
+            DestructorKind::Rest => ctx.text("..."),
             DestructorKind::Tuple(destructors) => {
-                ctx.write_many("(", ")", ", ", destructors, |ctx, destructor| {
-                    destructor.print(ctx)
-                })
+                let destructors = destructors.iter().map(|d| d.pretty_print(ctx)).collect();
+                ctx.delimited("(", ")", false, destructors)
             }
             DestructorKind::Record(fields) => {
-                ctx.write_many("{ ", " }", ", ", fields, |ctx, (name, destructor)| {
-                    name.print(ctx)?;
-                    // `{ x }` binds the field to a variable of the same name.
-                    let Some(destructor) = destructor else {
-                        return Ok(());
-                    };
-                    write!(ctx, ": ")?;
-                    destructor.print(ctx)
-                })
+                let fields = fields
+                    .iter()
+                    .map(|(name, destructor)| {
+                        let name = name.pretty_print(ctx);
+                        // `{ x }` is shorthand for `{ x: x }`.
+                        match destructor {
+                            Some(destructor) => name
+                                .append(ctx.text(": "))
+                                .append(destructor.pretty_print(ctx)),
+                            None => name,
+                        }
+                    })
+                    .collect();
+                ctx.delimited("{", "}", true, fields)
             }
-            // Cons destructors are not parsed yet, so no precedence handling.
-            DestructorKind::Cons { lhs, rhs } => {
-                lhs.print(ctx)?;
-                write!(ctx, " :: ")?;
-                rhs.print(ctx)
-            }
+            DestructorKind::Cons { lhs, rhs } => lhs
+                .pretty_print(ctx)
+                .append(ctx.text(" :: "))
+                .append(rhs.pretty_print(ctx)),
         }
     }
 }
 
 // --- Expressions ---
 
-impl Print for Expr {
-    fn print(&self, ctx: &mut Context) -> Result<()> {
-        let print_operand = |ctx: &mut Context, expr: &Expr, minimum| {
+impl PrettyPrint for Expr {
+    fn pretty_print(&self, ctx: &mut Context) -> Doc {
+        let operand = |ctx: &mut Context, expr: &Expr, minimum| {
             print_child(ctx, expr, expr_precedence(expr), minimum)
         };
         match &self.kind {
-            ExprKind::Literal(literal) => literal.print(ctx),
-            ExprKind::Var(name) => name.print(ctx),
+            ExprKind::Literal(literal) => literal.pretty_print(ctx),
+            ExprKind::Var(name) => name.pretty_print(ctx),
             ExprKind::BinaryExpr { op, lhs, rhs } => {
                 let (precedence, assoc) = binary_op(op.kind);
                 let (lhs_min, rhs_min) = operand_minimums(precedence, assoc);
-                print_operand(ctx, lhs, lhs_min)?;
-                write!(ctx, " {} ", op.kind)?;
-                print_operand(ctx, rhs, rhs_min)
+                // The break goes after the operator: an operator at the end of a line continues
+                // the item, an operand at the end of a line terminates it. An operand that
+                // breaks anyway, such as a `match`, keeps the operator on its line.
+                let separator = if has_hard_break(lhs) || has_hard_break(rhs) {
+                    RcDoc::space()
+                } else {
+                    RcDoc::line()
+                };
+                operand(ctx, lhs, lhs_min)
+                    .append(ctx.text(format!(" {}", op.kind)))
+                    .append(
+                        separator
+                            .append(operand(ctx, rhs, rhs_min))
+                            .nest(ctx.indent()),
+                    )
+                    .group()
             }
             ExprKind::UnaryExpr { op, expr } => {
-                write!(ctx, "{}", op.kind)?;
                 // Always parenthesise a compound operand: `-f y` reads as `(-f) y` to anyone
                 // used to OCaml, so print `-(f y)` even though the parser needs no parens.
-                print_operand(ctx, expr, ATOM)
+                ctx.text(op.kind.to_string())
+                    .append(operand(ctx, expr, ATOM))
             }
             ExprKind::Tuple(exprs) => {
-                ctx.write_many("(", ")", ", ", exprs, |ctx, expr| expr.print(ctx))
+                let exprs = exprs.iter().map(|expr| expr.pretty_print(ctx)).collect();
+                ctx.delimited("(", ")", false, exprs)
             }
             ExprKind::List(exprs) => {
-                ctx.write_many("[", "]", ", ", exprs, |ctx, expr| expr.print(ctx))
+                let exprs = exprs.iter().map(|expr| expr.pretty_print(ctx)).collect();
+                ctx.delimited("[", "]", false, exprs)
             }
             ExprKind::Record { fields } => {
-                ctx.write_many("{ ", " }", ", ", fields, |ctx, (name, expr)| {
-                    name.print(ctx)?;
-                    write!(ctx, ": ")?;
-                    expr.print(ctx)
-                })
+                let fields = fields
+                    .iter()
+                    .map(|(name, expr)| {
+                        name.pretty_print(ctx)
+                            .append(ctx.text(": "))
+                            .append(expr.pretty_print(ctx))
+                    })
+                    .collect();
+                ctx.delimited("{", "}", true, fields)
             }
             ExprKind::Conditional {
                 condition,
                 body,
                 otherwise,
             } => {
-                write!(ctx, "if ")?;
-                condition.print(ctx)?;
-                write!(ctx, " {{")?;
-                ctx.increase();
-                ctx.newline()?;
-                body.print(ctx)?;
-                ctx.decrease();
-                ctx.newline()?;
-                write!(ctx, "}}")?;
+                let body = body.pretty_print(ctx);
+                let mut doc = ctx
+                    .text("if ")
+                    .append(condition.pretty_print(ctx))
+                    .append(RcDoc::space())
+                    .append(ctx.block(body));
                 if let Some(otherwise) = otherwise {
-                    write!(ctx, " else ")?;
+                    let otherwise_doc = otherwise.pretty_print(ctx);
+                    doc = doc.append(ctx.text(" else "));
                     // `else { if .. }` prints as `else if ..`, so chains stay flat.
-                    if matches!(otherwise.kind, ExprKind::Conditional { .. }) {
-                        otherwise.print(ctx)?;
+                    doc = if matches!(otherwise.kind, ExprKind::Conditional { .. }) {
+                        doc.append(otherwise_doc)
                     } else {
-                        write!(ctx, "{{")?;
-                        ctx.increase();
-                        ctx.newline()?;
-                        otherwise.print(ctx)?;
-                        ctx.decrease();
-                        ctx.newline()?;
-                        write!(ctx, "}}")?;
-                    }
+                        doc.append(ctx.block(otherwise_doc))
+                    };
                 }
-                Ok(())
+                doc
             }
             ExprKind::Match { value, arms } => {
-                write!(ctx, "match ")?;
-                value.print(ctx)?;
-                write!(ctx, " {{")?;
-                ctx.increase();
-                for arm in arms {
-                    ctx.newline()?;
-                    write!(ctx, "| ")?;
-                    arm.print(ctx)?;
-                }
-                ctx.decrease();
-                ctx.newline()?;
-                Ok(write!(ctx, "}}")?)
+                let arms = arms
+                    .iter()
+                    .map(|arm| {
+                        RcDoc::hardline()
+                            .append(ctx.text("| "))
+                            .append(arm.pretty_print(ctx))
+                    })
+                    .collect::<Vec<_>>();
+                ctx.text("match ")
+                    .append(value.pretty_print(ctx))
+                    .append(ctx.text(" {"))
+                    .append(RcDoc::concat(arms).nest(ctx.indent()))
+                    .append(RcDoc::hardline())
+                    .append(ctx.text("}"))
             }
             // ponytail: `ret_ty` is dropped. The parser has no grammar for lambda return types yet.
             ExprKind::Lambda { params, body, .. } => {
-                ctx.write_many("", "", " ", params, |ctx, param| param.print(ctx))?;
-                write!(ctx, " -> ")?;
-                print_operand(ctx, body, LAMBDA)
+                let params = params
+                    .iter()
+                    .map(|param| param.pretty_print(ctx))
+                    .collect::<Vec<_>>();
+                let body_doc = operand(ctx, body, LAMBDA);
+                RcDoc::intersperse(params, RcDoc::space())
+                    .append(ctx.text(" ->"))
+                    .append(ctx.rhs(body, body_doc))
             }
             ExprKind::Call {
                 function,
                 arguments,
             } => {
-                print_operand(ctx, function, CALL)?;
-                write!(ctx, " ")?;
+                // Never breaks: a newline after an argument would end the item.
+                let function = operand(ctx, function, CALL).append(RcDoc::space());
                 if arguments.is_empty() {
-                    return Ok(write!(ctx, "()")?);
+                    return function.append(ctx.text("()"));
                 }
                 // Arguments must be atoms, so anything with an operator is parenthesised.
-                ctx.write_many("", "", ", ", arguments, |ctx, argument| {
-                    print_operand(ctx, argument, ATOM)
-                })
+                let arguments = arguments
+                    .iter()
+                    .map(|argument| operand(ctx, argument, ATOM))
+                    .collect::<Vec<_>>();
+                function.append(RcDoc::intersperse(arguments, ctx.text(", ")))
             }
         }
     }
 }
 
-impl Print for LambdaParam {
-    fn print(&self, ctx: &mut Context) -> Result<()> {
+impl PrettyPrint for LambdaParam {
+    fn pretty_print(&self, ctx: &mut Context) -> Doc {
         // OCaml style: an annotated parameter is written `(a: int)`.
         let Some(ty) = &self.ty else {
-            return self.parameter.print(ctx);
+            return self.parameter.pretty_print(ctx);
         };
-        write!(ctx, "(")?;
-        self.parameter.print(ctx)?;
-        write!(ctx, ": ")?;
-        ty.print(ctx)?;
-        Ok(write!(ctx, ")")?)
+        ctx.text("(")
+            .append(self.parameter.pretty_print(ctx))
+            .append(ctx.text(": "))
+            .append(ty.pretty_print(ctx))
+            .append(ctx.text(")"))
     }
 }
 
-impl Print for MatchArm {
-    fn print(&self, ctx: &mut Context) -> Result<()> {
-        self.pattern.print(ctx)?;
-        write!(ctx, " -> ")?;
-        self.expr.print(ctx)
+impl PrettyPrint for MatchArm {
+    fn pretty_print(&self, ctx: &mut Context) -> Doc {
+        let expr = self.expr.pretty_print(ctx);
+        self.pattern
+            .pretty_print(ctx)
+            .append(ctx.text(" ->"))
+            .append(ctx.rhs(&self.expr, expr))
     }
+}
+
+// --- Rendering ---
+
+/// Writes a document to an `io::Write`, turning the spaces `pretty` emits after each newline
+/// into tabs. Indentation arrives as its own `write_str` call straight after the `"\n"`, so a
+/// run of spaces anywhere else, such as inside a string literal, is left alone.
+struct Writer<'w> {
+    out: &'w mut dyn io::Write,
+    indent: usize,
+    tabs: bool,
+    after_newline: bool,
+}
+
+impl Render for Writer<'_> {
+    type Error = io::Error;
+
+    fn write_str(&mut self, s: &str) -> io::Result<usize> {
+        let is_indent = self.after_newline && !s.is_empty() && s.bytes().all(|b| b == b' ');
+        self.after_newline = s == "\n";
+        if is_indent && self.tabs {
+            for _ in 0..s.len() / self.indent {
+                self.out.write_all(b"\t")?;
+            }
+            self.out.write_all(&s.as_bytes()[..s.len() % self.indent])?;
+        } else {
+            self.out.write_all(s.as_bytes())?;
+        }
+        Ok(s.len())
+    }
+
+    fn fail_doc(&self) -> io::Error {
+        io::Error::other("document failed to render")
+    }
+}
+
+impl RenderAnnotated<'_, ()> for Writer<'_> {
+    fn push_annotation(&mut self, _: &()) -> io::Result<()> {
+        Ok(())
+    }
+
+    fn pop_annotation(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+/// Lays out `doc` against `settings.width` and writes it to `out`.
+pub(crate) fn render(doc: &Doc, settings: Settings, out: &mut dyn io::Write) -> io::Result<()> {
+    let mut writer = Writer {
+        out,
+        indent: settings.indent.max(1),
+        tabs: settings.tabs,
+        after_newline: false,
+    };
+    doc.render_raw(settings.width, &mut writer)
 }

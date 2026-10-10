@@ -1,9 +1,7 @@
-use std::{collections::BTreeMap, ops::Range};
+use std::{collections::BTreeMap, convert::Infallible, ops::Range};
 
 use kali_ast::{Comment, NodeId};
 use kali_parse::chumsky::span::SimpleSpan;
-
-use crate::error::{Error, Result};
 
 /// Comments attached to one AST node.
 #[derive(Debug, Clone, Default)]
@@ -69,9 +67,9 @@ impl<'a> CommentsPass<'a> {
 }
 
 impl kali_ast::Visitor for CommentsPass<'_> {
-    type Error = Error;
+    type Error = Infallible;
 
-    fn visit_item(&mut self, item: &kali_ast::Item) -> Result<()> {
+    fn visit_item(&mut self, item: &kali_ast::Item) -> Result<(), Self::Error> {
         let mut leading = self.claim(self.cursor..item.span.start);
         // `let a = 1; // note` trails `a` rather than leading the next item.
         if let Some(previous) = self.previous
@@ -88,7 +86,6 @@ impl kali_ast::Visitor for CommentsPass<'_> {
         }
         let comments = Comments {
             leading,
-            // ponytail: everything inside an item is dangling until expressions get their own pass.
             dangling: self.claim(item.span.start..item.span.end),
             trailing: Vec::new(),
         };

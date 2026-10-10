@@ -22,17 +22,14 @@ pub enum DebugCommand {
     Print {
         /// The file to print.
         file: PathBuf,
-        /// Whether to use pretty mode.
-        #[clap(long)]
-        pretty: bool,
     },
 }
 
-pub fn debug(command: DebugCommand, opts: &GlobalOpts) -> Result<()> {
+pub fn debug(command: DebugCommand, _opts: &GlobalOpts) -> Result<()> {
     match command {
         DebugCommand::Lex { file } => lex(file),
         DebugCommand::Parse { file } => parse(file),
-        DebugCommand::Print { file, pretty } => print(file, pretty),
+        DebugCommand::Print { file } => print(file),
     }
 }
 
@@ -60,7 +57,7 @@ fn parse(path: PathBuf) -> Result<()> {
     Ok(())
 }
 
-fn print(path: PathBuf, pretty: bool) -> Result<()> {
+fn print(path: PathBuf) -> Result<()> {
     let src = std::fs::read_to_string(&path).context("Failed to read file")?;
     let (module, errors) = kali_parse::parse_str(&src);
     let path = path.display().to_string();
@@ -68,11 +65,7 @@ fn print(path: PathBuf, pretty: bool) -> Result<()> {
         report.eprint(sources([(path.clone(), src.clone())]))?;
     }
     let module = module.context("Nothing to print, parsing failed")?;
-    if pretty {
-        kali_print::print_module_pretty(&module, &src, &mut std::io::stdout().lock())?;
-    } else {
-        kali_print::print_module(&module, &src, &mut std::io::stdout().lock())?;
-    }
+    kali_print::print_module(&module, &src, &mut std::io::stdout().lock())?;
     Ok(())
 }
 
