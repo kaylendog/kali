@@ -1,4 +1,4 @@
-use crate::common::{assert_eq, assert_fixed, assert_round_trip, print};
+use crate::common::{assert_eq, assert_round_trip, print};
 
 #[test]
 fn empty_module() {
@@ -46,9 +46,9 @@ fn line_before_closing_bracket_continues() {
 }
 
 #[test]
-fn multi_line_variants() {
-    assert_fixed("type S =\n\t| A\n\t| B\n");
-    assert_round_trip("type S = A\n\t| B", "type S =\n\t| A\n\t| B\n");
+fn variants_may_span_lines() {
+    assert_round_trip("type S =\n\t| A\n\t| B", "type S = A | B\n");
+    assert_round_trip("type S = A\n\t| B", "type S = A | B\n");
 }
 
 #[test]

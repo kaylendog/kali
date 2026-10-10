@@ -523,21 +523,21 @@ You can export multiple items from a module. Only exported items are accessible 
 To use exported items from another module, use the `import` keyword with path-based syntax. Path segments are separated by `::`. You can import all exported symbols from a module into scope:
 
 ```kali
-import example :: *
+import example::*
 ```
 
 Or import a specific item, optionally under another name:
 
 ```kali
-import example :: add_one
-import example :: add_one as inc
+import example::add_one
+import example::add_one as inc
 ```
 
 Several items from one module can be imported in a list, and paths can be nested:
 
 ```kali
-import std :: { result, vec as v }
-import std :: result :: result
+import std::{result, vec as v}
+import std::result::result
 ```
 
 ```ebnf

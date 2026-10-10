@@ -1,11 +1,15 @@
-use kali_print::print_module;
+use kali_print::{Settings, format_module};
 pub use pretty_assertions::assert_eq;
 
 pub fn print(src: &str) -> String {
+    print_with(src, Settings::default())
+}
+
+pub fn print_with(src: &str, settings: Settings) -> String {
     let (module, errors) = kali_parse::parse_str(src);
     assert!(errors.is_empty(), "{src:?} failed to parse: {errors:?}");
     let mut out = Vec::new();
-    print_module(&module.unwrap(), src, &mut out).unwrap();
+    format_module(&module.unwrap(), src, settings, &mut out).unwrap();
     String::from_utf8(out).unwrap()
 }
 

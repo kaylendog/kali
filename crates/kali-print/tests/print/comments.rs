@@ -12,7 +12,7 @@ fn empty_comment() {
 
 #[test]
 fn comments_on_every_item_kind() {
-    assert_fixed("/// A shape.\ntype Shape =\n\t| Circle(int)\n// io\nimport std :: io\n");
+    assert_fixed("/// A shape.\ntype Shape = Circle(int)\n// io\nimport std::io\n");
 }
 
 #[test]

@@ -9,6 +9,7 @@ thiserror = { workspace = true }
 kali-ast = { path = "../kali-ast" }
 kali-parse = { path = "../kali-parse" }
 lasso = "0.7.3"
+pretty = "0.12.5"
 
 [dev-dependencies]
 pretty_assertions = { workspace = true }
