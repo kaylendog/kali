@@ -73,31 +73,7 @@ impl Infer {
         }
     }
 
-    /// Lower every unbound variable in `ty` to at most `new_level`. Called when
-    /// a variable is bound to `ty`: anything reachable from it now belongs
-    /// to the binder's scope, so it must not be generalised by an inner
-    /// scope.
-    fn adjust_level(&mut self, ty: &Type, new_level: usize) {
-        match ty {
-            Type::Tuple(items) => items.iter().for_each(|item| self.adjust_level(item, new_level)),
-            Type::List(ty) => self.adjust_level(ty, new_level),
-            Type::Record(entries) => {
-                entries.values().for_each(|ty| self.adjust_level(ty, new_level))
-            }
-            Type::Fn(arg, ret) => {
-                self.adjust_level(arg, new_level);
-                self.adjust_level(ret, new_level);
-            }
-            Type::Var(var) => match &mut self.vars[var.0] {
-                VarState::Unbound { level, .. } => *level = (*level).min(new_level),
-                VarState::Bound(to) => {
-                    let to = to.clone();
-                    self.adjust_level(&to, new_level);
-                }
-            },
-            Type::Int | Type::Float | Type::Bool | Type::String | Type::Unit | Type::Error => {}
-        }
-    }
+    // --- Resolution ---
 
     /// Follow a bound variable one hop. Anything else is returned as is.
     fn resolve(&self, ty: &Type) -> Type {
@@ -130,6 +106,8 @@ impl Infer {
             }
         }
     }
+
+    // --- Unification ---
 
     /// Unify two types.
     fn unify(&mut self, lhs: &Type, rhs: &Type, origin: Origin) -> Type {
@@ -302,6 +280,32 @@ impl Infer {
             Type::List(ty) => self.occurs(var, ty),
             Type::Record(entries) => entries.values().any(|item| self.occurs(var, item)),
             Type::Fn(param, ret) => self.occurs(var, param) || self.occurs(var, ret),
+        }
+    }
+
+    /// Lower every unbound variable in `ty` to at most `new_level`. Called when
+    /// a variable is bound to `ty`: anything reachable from it now belongs
+    /// to the binder's scope, so it must not be generalised by an inner
+    /// scope.
+    fn adjust_level(&mut self, ty: &Type, new_level: usize) {
+        match ty {
+            Type::Tuple(items) => items.iter().for_each(|item| self.adjust_level(item, new_level)),
+            Type::List(ty) => self.adjust_level(ty, new_level),
+            Type::Record(entries) => {
+                entries.values().for_each(|ty| self.adjust_level(ty, new_level))
+            }
+            Type::Fn(arg, ret) => {
+                self.adjust_level(arg, new_level);
+                self.adjust_level(ret, new_level);
+            }
+            Type::Var(var) => match &mut self.vars[var.0] {
+                VarState::Unbound { level, .. } => *level = (*level).min(new_level),
+                VarState::Bound(to) => {
+                    let to = to.clone();
+                    self.adjust_level(&to, new_level);
+                }
+            },
+            Type::Int | Type::Float | Type::Bool | Type::String | Type::Unit | Type::Error => {}
         }
     }
 }
