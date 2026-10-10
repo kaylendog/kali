@@ -1,31 +1,38 @@
 use std::{collections::BTreeMap, hash::Hash};
 
+mod span;
 mod visit;
 
+pub use span::Span;
 pub use visit::{Visitor, WalkOrder, Walker};
 
-/// Represents a module in the source code, containing a collection of items and a string interning cache.
+/// Represents a module in the source code, containing a collection of items and
+/// a string interning cache.
 #[derive(Debug, Clone)]
 pub struct Module {
-    /// The items defined within the module, such as functions, structs, or other modules.
+    /// The items defined within the module, such as functions, structs, or
+    /// other modules.
     pub items: Vec<Item>,
-    /// A string interning cache used to efficiently store and retrieve strings within the module.
+    /// A string interning cache used to efficiently store and retrieve strings
+    /// within the module.
     pub cache: lasso::Rodeo,
     /// A collection of comments found in the source code, keyed by their span.
-    pub comments: BTreeMap<chumsky::span::SimpleSpan, Comment>,
+    pub comments: BTreeMap<Span, Comment>,
 }
 
-/// The type used to uniquely identify nodes in the abstract syntax tree (AST). Aliased in case I
-/// ever change this to something fancier like `rustc`'s `NodeId` type.
+/// The type used to uniquely identify nodes in the abstract syntax tree (AST).
+/// Aliased in case I ever change this to something fancier like `rustc`'s
+/// `NodeId` type.
 pub type NodeId = u32;
 
-/// Represents an identifier in the source code, including its textual value and span.
+/// Represents an identifier in the source code, including its textual value and
+/// span.
 #[derive(Debug, Clone, Copy)]
 pub struct Ident {
     /// The index of the identifier in the table.
     pub key: lasso::Spur,
     /// The span of the identifier in the source code.
-    pub span: chumsky::span::SimpleSpan,
+    pub span: Span,
 }
 
 impl PartialEq for Ident {
@@ -50,7 +57,7 @@ pub struct Comment {
     /// The kind of comment.
     pub kind: CommentKind,
     /// The span of the comment in the source code.
-    pub span: chumsky::span::SimpleSpan,
+    pub span: Span,
 }
 
 /// An enumeration of the three kinds of comment.
@@ -62,13 +69,14 @@ pub enum CommentKind {
     Doc,
 }
 
-/// Represents an item in the source code, such as a function, struct, or module.
+/// Represents an item in the source code, such as a function, struct, or
+/// module.
 #[derive(Debug, Clone)]
 pub struct Item {
     /// A unique identifier for the item in the abstract syntax tree (AST).
     pub id: NodeId,
     /// The span of the item in the source code.
-    pub span: chumsky::span::SimpleSpan,
+    pub span: Span,
     /// The kind of the item (e.g., function, struct, etc.).
     pub kind: ItemKind,
     /// The visibility of the item (e.g., private, exported, or inherited).
@@ -106,7 +114,7 @@ pub struct ImportTree {
     /// The kind of the import tree.
     pub kind: ImportTreeKind,
     /// The span of the import tree in the source code.
-    pub span: chumsky::span::SimpleSpan,
+    pub span: Span,
 }
 
 /// A tree of imports.
@@ -119,7 +127,8 @@ pub enum ImportTreeKind {
         /// An optional alias for the item.
         alias: Option<Ident>,
     },
-    /// Represents a segment in the import tree with a name and a child node, e.g. `module::`
+    /// Represents a segment in the import tree with a name and a child node,
+    /// e.g. `module::`
     Segment {
         /// The name of the segment.
         name: Ident,
@@ -152,15 +161,17 @@ pub struct TypeDecl {
     pub variants: Vec<Variant>,
 }
 
-/// One variant of a sum type. Its constructor is a function from the payload to the type.
+/// One variant of a sum type. Its constructor is a function from the payload to
+/// the type.
 #[derive(Debug, Clone)]
 pub struct Variant {
     /// The constructor name.
     pub name: Ident,
-    /// The payload type. `Circle(int)` is `int`, `Rectangle(int, int)` is a tuple, `Point` is none.
+    /// The payload type. `Circle(int)` is `int`, `Rectangle(int, int)` is a
+    /// tuple, `Point` is none.
     pub payload: Option<Type>,
     /// The span of the variant in the source code.
-    pub span: chumsky::span::SimpleSpan,
+    pub span: Span,
 }
 
 /// Represents a type in the source code, including its span and kind.
@@ -169,7 +180,7 @@ pub struct Type {
     /// A unique identifier for the type in the abstract syntax tree (AST).
     pub id: NodeId,
     /// The span of the type in the source code.
-    pub span: chumsky::span::SimpleSpan,
+    pub span: Span,
     /// The kind of type (primitive, function, tuple, etc.).
     pub kind: TypeKind,
 }
@@ -218,10 +229,11 @@ pub struct Definition {
 /// Represents an expression item in the source code.
 #[derive(Debug, Clone)]
 pub struct Expr {
-    /// A unique identifier for the expression in the abstract syntax tree (AST).
+    /// A unique identifier for the expression in the abstract syntax tree
+    /// (AST).
     pub id: NodeId,
     /// The span of the expression in the source code.
-    pub span: chumsky::span::SimpleSpan,
+    pub span: Span,
     /// The kind of expression.
     pub kind: ExprKind,
 }
@@ -302,13 +314,14 @@ pub enum LiteralKind {
     Unit,
 }
 
-/// Represents a binary operator in the source code, including its kind and span.
+/// Represents a binary operator in the source code, including its kind and
+/// span.
 #[derive(Debug, Clone)]
 pub struct BinaryOp {
     /// The kind of binary operator (e.g., addition, subtraction, etc.).
     pub kind: BinaryOpKind,
     /// The span of the binary operator in the source code.
-    pub span: chumsky::span::SimpleSpan,
+    pub span: Span,
 }
 
 /// Represents the kind of binary operator in the source code.
@@ -364,7 +377,7 @@ pub struct UnaryOp {
     /// The kind of unary operator (e.g., negation, logical not, bitwise not).
     pub kind: UnaryOpKind,
     /// The span of the unary operator in the source code.
-    pub span: chumsky::span::SimpleSpan,
+    pub span: Span,
 }
 
 /// An enumeration of unary operators.
@@ -390,7 +403,7 @@ pub struct MatchArm {
     /// A unique identifier for the arm in the abstract syntax tree (AST).
     pub id: NodeId,
     /// The span of the match arm in the source code.
-    pub span: chumsky::span::SimpleSpan,
+    pub span: Span,
     /// The pattern to match.
     pub pattern: Pattern,
     /// The expression to execute if the pattern matches.
@@ -403,7 +416,7 @@ pub struct Pattern {
     /// A unique identifier for the pattern in the abstract syntax tree (AST).
     pub id: NodeId,
     /// The span of the pattern in the source code.
-    pub span: chumsky::span::SimpleSpan,
+    pub span: Span,
     /// The kind of pattern (literal, identifier, tuple, etc.).
     pub kind: PatternKind,
 }
@@ -422,17 +435,11 @@ pub enum PatternKind {
     /// A record pattern (e.g., `{ x, y }`).
     Record(indexmap::IndexMap<Ident, Pattern>),
     /// A cons pattern (e.g., `a :: b`).
-    Cons {
-        lhs: Box<Pattern>,
-        rhs: Box<Pattern>,
-    },
+    Cons { lhs: Box<Pattern>, rhs: Box<Pattern> },
     /// The empty list.
     EmptyList,
     /// An or-pattern (e.g., `A | B`).
-    Or {
-        lhs: Box<Pattern>,
-        rhs: Box<Pattern>,
-    },
+    Or { lhs: Box<Pattern>, rhs: Box<Pattern> },
     /// A constructor pattern (e.g., `Circle(r)` or `Point`).
     Constructor {
         /// The constructor name.
@@ -453,13 +460,15 @@ pub struct LambdaParam {
     pub ty: Option<Type>,
 }
 
-/// Represents a destructor pattern, which is a pattern with only free variables.
+/// Represents a destructor pattern, which is a pattern with only free
+/// variables.
 #[derive(Debug, Clone)]
 pub struct Destructor {
-    /// A unique identifier for the destructor in the abstract syntax tree (AST).
+    /// A unique identifier for the destructor in the abstract syntax tree
+    /// (AST).
     pub id: NodeId,
     /// The span of the destructor in the source code.
-    pub span: chumsky::span::SimpleSpan,
+    pub span: Span,
     /// THe kind of destructor.
     pub kind: DestructorKind,
 }
@@ -474,10 +483,7 @@ pub enum DestructorKind {
     /// A record destructor with named fields.
     Record(indexmap::IndexMap<Ident, Option<Destructor>>),
     /// A cons destructor (e.g., `a :: b`).
-    Cons {
-        lhs: Box<Destructor>,
-        rhs: Box<Destructor>,
-    },
+    Cons { lhs: Box<Destructor>, rhs: Box<Destructor> },
     /// A rest destructor.
     Rest,
 }

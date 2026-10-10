@@ -5,22 +5,24 @@ use crate::{
 
 /// A trait for visiting elements of the Kali Abstract Syntax Tree (AST).
 ///
-/// This trait provides a mechanism for performing operations on individual elements
-/// of the Kali AST. It is designed to be used in scenarios where you need to
-/// process or analyse specific parts of the hierarchical or structured representation
-/// of the AST.
+/// This trait provides a mechanism for performing operations on individual
+/// elements of the Kali AST. It is designed to be used in scenarios where you
+/// need to process or analyse specific parts of the hierarchical or structured
+/// representation of the AST.
 ///
 /// # Associated Types
 ///
-/// * `Error` - The type of error that may be returned during the visit operation.
+/// * `Error` - The type of error that may be returned during the visit
+///   operation.
 ///
 /// # Required Methods
 ///
-/// * `visit` - The method responsible for visiting a specific target of type `T`
-///   within the Kali AST. It takes a reference to the target and returns a `Result`
-///   indicating success or failure.
+/// * `visit` - The method responsible for visiting a specific target of type
+///   `T` within the Kali AST. It takes a reference to the target and returns a
+///   `Result` indicating success or failure.
 pub trait Visitor {
-    /// The associated error type that may be returned during the visit operation.
+    /// The associated error type that may be returned during the visit
+    /// operation.
     type Error;
 
     /// Visits a module within the Kali AST.
@@ -463,11 +465,7 @@ impl Walker {
                     self.walk_expr(visitor, value)?;
                 }
             }
-            ExprKind::Conditional {
-                condition,
-                body,
-                otherwise,
-            } => {
+            ExprKind::Conditional { condition, body, otherwise } => {
                 self.walk_expr(visitor, condition)?;
                 self.walk_expr(visitor, body)?;
                 if let Some(otherwise_expr) = otherwise {
@@ -480,11 +478,7 @@ impl Walker {
                     self.walk_match_arm(visitor, arm)?;
                 }
             }
-            ExprKind::Lambda {
-                params,
-                ret_ty,
-                body,
-            } => {
+            ExprKind::Lambda { params, ret_ty, body } => {
                 for param in params {
                     self.walk_lambda_param(visitor, param)?;
                 }
@@ -493,10 +487,7 @@ impl Walker {
                 }
                 self.walk_expr(visitor, body)?;
             }
-            ExprKind::Call {
-                function,
-                arguments,
-            } => {
+            ExprKind::Call { function, arguments } => {
                 self.walk_expr(visitor, function)?;
                 for arg in arguments {
                     self.walk_expr(visitor, arg)?;

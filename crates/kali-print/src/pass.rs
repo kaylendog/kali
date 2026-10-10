@@ -1,7 +1,6 @@
 use std::{collections::BTreeMap, convert::Infallible, ops::Range};
 
-use kali_ast::{Comment, NodeId};
-use kali_parse::chumsky::span::SimpleSpan;
+use kali_ast::{Comment, NodeId, Span};
 
 /// Comments attached to one AST node.
 #[derive(Debug, Clone, Default)]
@@ -14,49 +13,42 @@ pub(crate) struct Comments {
     pub(crate) dangling: Vec<Comment>,
 }
 
-/// Attaches each comment to exactly one node. Items must be visited in source order.
+/// Attaches each comment to exactly one node. Items must be visited in source
+/// order.
 pub(crate) struct CommentsPass<'a> {
     /// Every comment in the module, keyed by span.
-    raw: &'a BTreeMap<SimpleSpan, Comment>,
-    /// Original source, used to tell `let a = 1 // note` from a comment on its own line.
+    raw: &'a BTreeMap<Span, Comment>,
+    /// Original source, used to tell `let a = 1 // note` from a comment on its
+    /// own line.
     src: &'a str,
     /// Comments claimed so far, keyed by node.
     resolved: BTreeMap<NodeId, Comments>,
-    /// End of the last item visited. Comments between here and the next item lead that item.
+    /// End of the last item visited. Comments between here and the next item
+    /// lead that item.
     cursor: usize,
     /// The last item visited, which an end-of-line comment trails.
     previous: Option<NodeId>,
 }
 
 impl<'a> CommentsPass<'a> {
-    pub(crate) fn new(raw: &'a BTreeMap<SimpleSpan, Comment>, src: &'a str) -> Self {
-        Self {
-            raw,
-            src,
-            resolved: BTreeMap::new(),
-            cursor: 0,
-            previous: None,
-        }
+    pub(crate) fn new(raw: &'a BTreeMap<Span, Comment>, src: &'a str) -> Self {
+        Self { raw, src, resolved: BTreeMap::new(), cursor: 0, previous: None }
     }
 
     /// Whether `comment` sits on the same line as the end of the previous item.
     fn is_end_of_line(&self, comment: &Comment) -> bool {
-        self.src
-            .get(self.cursor..comment.span.start)
-            .is_some_and(|gap| !gap.contains('\n'))
+        self.src.get(self.cursor..comment.span.start).is_some_and(|gap| !gap.contains('\n'))
     }
 
     /// Returns the comments starting within `range`, in source order.
     fn claim(&self, range: Range<usize>) -> Vec<Comment> {
-        let lower: SimpleSpan = (range.start..range.start).into();
-        let upper: SimpleSpan = (range.end..range.end).into();
-        self.raw
-            .range(lower..upper)
-            .map(|(_, comment)| comment.clone())
-            .collect()
+        let lower: Span = (range.start..range.start).into();
+        let upper: Span = (range.end..range.end).into();
+        self.raw.range(lower..upper).map(|(_, comment)| comment.clone()).collect()
     }
 
-    /// Attaches any comments after the last item as trailing comments of that item.
+    /// Attaches any comments after the last item as trailing comments of that
+    /// item.
     pub(crate) fn finish(mut self) -> BTreeMap<NodeId, Comments> {
         let rest = self.claim(self.cursor..usize::MAX);
         if let Some(previous) = self.previous {
@@ -73,16 +65,10 @@ impl kali_ast::Visitor for CommentsPass<'_> {
         let mut leading = self.claim(self.cursor..item.span.start);
         // `let a = 1; // note` trails `a` rather than leading the next item.
         if let Some(previous) = self.previous
-            && leading
-                .first()
-                .is_some_and(|comment| self.is_end_of_line(comment))
+            && leading.first().is_some_and(|comment| self.is_end_of_line(comment))
         {
             let comment = leading.remove(0);
-            self.resolved
-                .entry(previous)
-                .or_default()
-                .trailing
-                .push(comment);
+            self.resolved.entry(previous).or_default().trailing.push(comment);
         }
         let comments = Comments {
             leading,
@@ -120,11 +106,7 @@ mod tests {
             .iter()
             .map(|item| {
                 let comments = &resolved[&item.id];
-                (
-                    comments.leading.len(),
-                    comments.dangling.len(),
-                    comments.trailing.len(),
-                )
+                (comments.leading.len(), comments.dangling.len(), comments.trailing.len())
             })
             .collect();
         assert_eq!(counts, vec![(1, 0, 1), (0, 0, 1)]);

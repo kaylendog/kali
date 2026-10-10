@@ -1,5 +1,7 @@
 use std::collections::BTreeMap;
 
+/// Re-export.
+pub use chumsky::{self};
 use chumsky::{
     extra::SimpleState,
     input::{Input, MapExtra, Stream, ValueInput},
@@ -16,22 +18,23 @@ use logos::Logos;
 
 pub use crate::lexer::Token;
 
-/// Re-export.
-pub use chumsky::{self};
-
 mod lexer;
 
-/// Represents the state used during parsing, including a string interner for efficient string handling.
+/// Represents the state used during parsing, including a string interner for
+/// efficient string handling.
 #[derive(Default)]
 struct State {
-    /// A counter to generate unique identifiers for nodes in the abstract syntax tree (AST).
+    /// A counter to generate unique identifiers for nodes in the abstract
+    /// syntax tree (AST).
     next_id: NodeId,
-    /// A `Rodeo` instance from the `lasso` crate, used for interning strings to reduce memory usage and improve performance.
+    /// A `Rodeo` instance from the `lasso` crate, used for interning strings to
+    /// reduce memory usage and improve performance.
     rodeo: lasso::Rodeo,
 }
 
 impl State {
-    /// Generates a new unique identifier for a node in the abstract syntax tree (AST).
+    /// Generates a new unique identifier for a node in the abstract syntax tree
+    /// (AST).
     fn next_id(&mut self) -> NodeId {
         let id = self.next_id;
         self.next_id += 1;
@@ -40,20 +43,16 @@ impl State {
 }
 
 /// Concrete type for the parser extras.
-type Extras<'src> = extra::Full<Rich<'src, Token<'src>>, SimpleState<State>, ()>;
+type Extras<'src> = extra::Full<Rich<'src, Token<'src>, kali_ast::Span>, SimpleState<State>, ()>;
 
 /// Shorthand function to construct a [`BinaryOp`].
 fn binary_op<'src, I>(
     op: impl Parser<'src, I, BinaryOpKind, Extras<'src>> + 'src,
 ) -> impl Parser<'src, I, BinaryOp, Extras<'src>> + Clone
 where
-    I: ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>,
+    I: ValueInput<'src, Token = Token<'src>, Span = kali_ast::Span>,
 {
-    op.map_with(|kind, e| BinaryOp {
-        kind,
-        span: e.span(),
-    })
-    .boxed()
+    op.map_with(|kind, e| BinaryOp { kind, span: e.span() }).boxed()
 }
 
 /// Shorthand function to construct a [`BinaryExpr`].
@@ -64,31 +63,24 @@ fn binary_expr<'src, I>(
     e: &mut MapExtra<'src, '_, I, Extras<'src>>,
 ) -> Expr
 where
-    I: ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>,
+    I: ValueInput<'src, Token = Token<'src>, Span = kali_ast::Span>,
 {
     Expr {
         id: e.state().next_id(),
-        kind: ExprKind::BinaryExpr {
-            op,
-            lhs: Box::new(lhs),
-            rhs: Box::new(rhs),
-        },
+        kind: ExprKind::BinaryExpr { op, lhs: Box::new(lhs), rhs: Box::new(rhs) },
         span: e.span(),
     }
 }
 
 pub(crate) fn parser<'src, I>() -> impl Parser<'src, I, Vec<Item>, Extras<'src>>
 where
-    I: ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>,
+    I: ValueInput<'src, Token = Token<'src>, Span = kali_ast::Span>,
 {
     // ident ::= Ident
     let ident = select! { Token::Ident(ident) => ident }
         .map_with(|ident, e| {
             let state: &mut SimpleState<State> = e.state();
-            Ident {
-                key: state.rodeo.get_or_intern(ident),
-                span: e.span(),
-            }
+            Ident { key: state.rodeo.get_or_intern(ident), span: e.span() }
         })
         .labelled("identifier");
 
@@ -98,10 +90,7 @@ where
     }
     .map_with(|name, e| {
         let state: &mut SimpleState<State> = e.state();
-        Ident {
-            key: state.rodeo.get_or_intern(name),
-            span: e.span(),
-        }
+        Ident { key: state.rodeo.get_or_intern(name), span: e.span() }
     })
     .labelled("constructor");
 
@@ -126,7 +115,8 @@ where
 
     // ty ::= primitive | named | tuple | list | record | (ty)
     let ty = recursive(|ty| {
-        // primitive ::= TypeBool | TypeFloat | TypeInteger | TypeString | LitUnit
+        // primitive ::= TypeBool | TypeFloat | TypeInteger | TypeString |
+        // LitUnit
         let primitive = select! {
             Token::TypeBool => PrimitiveTypeKind::Bool,
             Token::TypeFloat => PrimitiveTypeKind::Float,
@@ -171,33 +161,28 @@ where
         choice((primitive, named, tuple, list, record))
             .map_with(|kind, e| {
                 let state: &mut SimpleState<State> = e.state();
-                Type {
-                    id: state.next_id(),
-                    kind,
-                    span: e.span(),
-                }
+                Type { id: state.next_id(), kind, span: e.span() }
             })
-            .or(ty
-                .clone()
-                .delimited_by(just(Token::SymLParen), just(Token::SymRParen)))
+            .or(ty.clone().delimited_by(just(Token::SymLParen), just(Token::SymRParen)))
     })
     .labelled("type");
 
-    // pattern ::= literal | variable | wildcard | tuple | record | empty_list | (pattern)
+    // pattern ::= literal | variable | wildcard | tuple | record | empty_list |
+    // (pattern)
     let pattern = recursive(|pattern| {
         // literal ::= -? literal_kind
-        // Patterns have no negation, so a leading `-` is folded into a numeric literal.
+        // Patterns have no negation, so a leading `-` is folded into a numeric
+        // literal.
         let negative = just(Token::OpSubtract).ignore_then(select! {
             Token::LitInteger(value) => LiteralKind::Integer(-value),
             Token::LitFloat(value) => LiteralKind::Float(-value),
         });
-        let atom_literal = negative
-            .or(literal_kind)
-            .map(PatternKind::Literal)
-            .labelled("literal pattern");
+        let atom_literal =
+            negative.or(literal_kind).map(PatternKind::Literal).labelled("literal pattern");
 
         // constructor_pattern ::= constructor [( pattern (, pattern)* )]
-        // A single payload pattern is used as is; several become a tuple pattern.
+        // A single payload pattern is used as is; several become a tuple
+        // pattern.
         let constructor_payload = pattern
             .clone()
             .separated_by(just(Token::SymComma))
@@ -209,11 +194,7 @@ where
                     return patterns.remove(0);
                 }
                 let state: &mut SimpleState<State> = e.state();
-                Pattern {
-                    id: state.next_id(),
-                    kind: PatternKind::Tuple(patterns),
-                    span: e.span(),
-                }
+                Pattern { id: state.next_id(), kind: PatternKind::Tuple(patterns), span: e.span() }
             })
             .delimited_by(just(Token::SymLParen), just(Token::SymRParen));
         let atom_constructor = constructor
@@ -228,9 +209,8 @@ where
         let atom_variable = ident.map(PatternKind::Var).labelled("variable pattern");
 
         // wildcard ::= _
-        let atom_wildcard = just(Token::SymWildcard)
-            .to(PatternKind::Wildcard)
-            .labelled("wildcard pattern");
+        let atom_wildcard =
+            just(Token::SymWildcard).to(PatternKind::Wildcard).labelled("wildcard pattern");
 
         // tuple ::= (pattern (, pattern)*)
         let atom_tuple = pattern
@@ -255,9 +235,8 @@ where
             .labelled("record pattern");
 
         // empty_list ::= []
-        let atom_empty_list = just(Token::SymArray)
-            .to(PatternKind::EmptyList)
-            .labelled("empty list pattern");
+        let atom_empty_list =
+            just(Token::SymArray).to(PatternKind::EmptyList).labelled("empty list pattern");
 
         // `atom_constructor` before `atom_variable`: both accept an identifier.
         let atom = choice((
@@ -271,32 +250,21 @@ where
         ))
         .map_with(|kind, e| {
             let state: &mut SimpleState<State> = e.state();
-            Pattern {
-                id: state.next_id(),
-                kind,
-                span: e.span(),
-            }
+            Pattern { id: state.next_id(), kind, span: e.span() }
         })
         .or(pattern.delimited_by(just(Token::SymLParen), just(Token::SymRParen)))
         .labelled("pattern");
 
         // pattern ::= pattern :: pattern | pattern | pattern
         atom.pratt((
-            infix(
-                Associativity::Right(2),
-                just(Token::OpCons),
-                |lhs, _, rhs, e| {
-                    let state: &mut SimpleState<State> = e.state();
-                    Pattern {
-                        id: state.next_id(),
-                        kind: PatternKind::Cons {
-                            lhs: Box::new(lhs),
-                            rhs: Box::new(rhs),
-                        },
-                        span: e.span(),
-                    }
-                },
-            ),
+            infix(Associativity::Right(2), just(Token::OpCons), |lhs, _, rhs, e| {
+                let state: &mut SimpleState<State> = e.state();
+                Pattern {
+                    id: state.next_id(),
+                    kind: PatternKind::Cons { lhs: Box::new(lhs), rhs: Box::new(rhs) },
+                    span: e.span(),
+                }
+            }),
             infix(
                 // `|` is loosest, as in OCaml and Rust: `a :: b | c` is `(a :: b) | c`.
                 Associativity::Left(1),
@@ -305,10 +273,7 @@ where
                     let state: &mut SimpleState<State> = e.state();
                     Pattern {
                         id: state.next_id(),
-                        kind: PatternKind::Or {
-                            lhs: Box::new(lhs),
-                            rhs: Box::new(rhs),
-                        },
+                        kind: PatternKind::Or { lhs: Box::new(lhs), rhs: Box::new(rhs) },
                         span: e.span(),
                     }
                 },
@@ -320,9 +285,7 @@ where
     // destructor ::= variable | tuple | record | (destructor)
     let destructor = recursive(|destructor| {
         // variable ::= ident
-        let atom_variable = ident
-            .map(DestructorKind::Var)
-            .labelled("variable destructor");
+        let atom_variable = ident.map(DestructorKind::Var).labelled("variable destructor");
 
         // tuple ::= (destructor (, destructor)*)
         let atom_tuple = destructor
@@ -337,11 +300,7 @@ where
 
         // record_item := ident (: destructor)?
         let atom_record_item = ident
-            .then(
-                just(Token::SymColon)
-                    .ignore_then(destructor.clone())
-                    .or_not(),
-            )
+            .then(just(Token::SymColon).ignore_then(destructor.clone()).or_not())
             .map(|(name, value)| (name, value))
             .labelled("record item");
 
@@ -358,22 +317,17 @@ where
         choice((atom_variable, atom_tuple, atom_record))
             .map_with(|kind, e| {
                 let state: &mut SimpleState<State> = e.state();
-                Destructor {
-                    id: state.next_id(),
-                    kind,
-                    span: e.span(),
-                }
+                Destructor { id: state.next_id(), kind, span: e.span() }
             })
             .or(destructor.delimited_by(just(Token::SymLParen), just(Token::SymRParen)))
     })
     .labelled("destructor");
 
-    // expr ::= literal | variable | tuple | list | if_expr | match_expr | (expr)
+    // expr ::= literal | variable | tuple | list | if_expr | match_expr |
+    // (expr)
     let expr = recursive(|expr| {
         // literal ::= literal_kind
-        let atom_literal = literal_kind
-            .map(ExprKind::Literal)
-            .labelled("literal expression");
+        let atom_literal = literal_kind.map(ExprKind::Literal).labelled("literal expression");
 
         // variable ::= ident
         let atom_variable = ident.map(ExprKind::Var).labelled("variable expression");
@@ -401,27 +355,18 @@ where
             .labelled("list expression");
 
         // if_expr ::= if expr { expr } (else ({ expr } | if_expr))?
-        // `else if ..` is `else { if .. }`: the nested `if` is the whole else branch.
+        // `else if ..` is `else { if .. }`: the nested `if` is the whole else
+        // branch.
         let atom_if = recursive(|atom_if| {
-            let block = expr
-                .clone()
-                .delimited_by(just(Token::SymLBrace), just(Token::SymRBrace));
+            let block = expr.clone().delimited_by(just(Token::SymLBrace), just(Token::SymRBrace));
             let else_if = atom_if.map_with(|kind, e| {
                 let state: &mut SimpleState<State> = e.state();
-                Expr {
-                    id: state.next_id(),
-                    kind,
-                    span: e.span(),
-                }
+                Expr { id: state.next_id(), kind, span: e.span() }
             });
             just(Token::KeywordIf)
                 .ignore_then(expr.clone())
                 .then(block.clone())
-                .then(
-                    just(Token::KeywordElse)
-                        .ignore_then(block.or(else_if))
-                        .or_not(),
-                )
+                .then(just(Token::KeywordElse).ignore_then(block.or(else_if)).or_not())
                 .map(|((condition, body), otherwise)| ExprKind::Conditional {
                     condition: Box::new(condition),
                     body: Box::new(body),
@@ -432,56 +377,32 @@ where
 
         // match_expr ::= match expr { |? arm (| arm)* }
         // arm ::= pattern -> expr
-        let arm = pattern
-            .clone()
-            .then_ignore(just(Token::SymArrow))
-            .then(expr.clone())
-            .map_with(|(pattern, expr), e| {
+        let arm = pattern.clone().then_ignore(just(Token::SymArrow)).then(expr.clone()).map_with(
+            |(pattern, expr), e| {
                 let state: &mut SimpleState<State> = e.state();
-                MatchArm {
-                    id: state.next_id(),
-                    pattern,
-                    expr,
-                    span: e.span(),
-                }
-            });
+                MatchArm { id: state.next_id(), pattern, expr, span: e.span() }
+            },
+        );
         let atom_match = just(Token::KeywordMatch)
             .ignore_then(expr.clone())
             .then(
                 just(Token::OpBitwiseOr)
                     .or_not()
                     .ignore_then(
-                        arm.separated_by(just(Token::OpBitwiseOr))
-                            .at_least(1)
-                            .collect::<Vec<_>>(),
+                        arm.separated_by(just(Token::OpBitwiseOr)).at_least(1).collect::<Vec<_>>(),
                     )
                     .delimited_by(just(Token::SymLBrace), just(Token::SymRBrace)),
             )
-            .map(|(value, arms)| ExprKind::Match {
-                value: Box::new(value),
-                arms,
-            })
+            .map(|(value, arms)| ExprKind::Match { value: Box::new(value), arms })
             .labelled("match expression");
 
-        let atom = choice((
-            atom_literal,
-            atom_variable,
-            atom_tuple,
-            atom_list,
-            atom_if,
-            atom_match,
-        ))
-        .map_with(|kind, e| {
-            let state: &mut SimpleState<State> = e.state();
-            Expr {
-                id: state.next_id(),
-                kind,
-                span: e.span(),
-            }
-        })
-        .or(expr
-            .clone()
-            .delimited_by(just(Token::SymLParen), just(Token::SymRParen)));
+        let atom =
+            choice((atom_literal, atom_variable, atom_tuple, atom_list, atom_if, atom_match))
+                .map_with(|kind, e| {
+                    let state: &mut SimpleState<State> = e.state();
+                    Expr { id: state.next_id(), kind, span: e.span() }
+                })
+                .or(expr.clone().delimited_by(just(Token::SymLParen), just(Token::SymRParen)));
 
         // expr ::= lambda | unary_expr | call | binary_expr
         atom.clone().pratt((
@@ -497,14 +418,8 @@ where
                         .then_ignore(just(Token::SymColon))
                         .then(ty.clone())
                         .delimited_by(just(Token::SymLParen), just(Token::SymRParen))
-                        .map(|(parameter, ty)| LambdaParam {
-                            parameter,
-                            ty: Some(ty),
-                        }),
-                    destructor.clone().map(|parameter| LambdaParam {
-                        parameter,
-                        ty: None,
-                    }),
+                        .map(|(parameter, ty)| LambdaParam { parameter, ty: Some(ty) }),
+                    destructor.clone().map(|parameter| LambdaParam { parameter, ty: None }),
                 ))
                 .repeated()
                 .at_least(1)
@@ -514,11 +429,7 @@ where
                     let state: &mut SimpleState<State> = e.state();
                     Expr {
                         id: state.next_id(),
-                        kind: ExprKind::Lambda {
-                            params,
-                            ret_ty: None,
-                            body: Box::new(body),
-                        },
+                        kind: ExprKind::Lambda { params, ret_ty: None, body: Box::new(body) },
                         span: e.span(),
                     }
                 },
@@ -533,18 +444,12 @@ where
                      Token::OpNegate => UnaryOpKind::LogicalNot,
                      Token::OpSubtract => UnaryOpKind::Negate,
                 }
-                .map_with(|kind, e| UnaryOp {
-                    kind,
-                    span: e.span(),
-                }),
+                .map_with(|kind, e| UnaryOp { kind, span: e.span() }),
                 |op, expr, e| {
                     let state: &mut SimpleState<State> = e.state();
                     Expr {
                         id: state.next_id(),
-                        kind: ExprKind::UnaryExpr {
-                            expr: Box::new(expr),
-                            op,
-                        },
+                        kind: ExprKind::UnaryExpr { expr: Box::new(expr), op },
                         span: e.span(),
                     }
                 },
@@ -561,10 +466,7 @@ where
                     let state: &mut SimpleState<State> = e.state();
                     Expr {
                         id: state.next_id(),
-                        kind: ExprKind::Call {
-                            function: Box::new(function),
-                            arguments,
-                        },
+                        kind: ExprKind::Call { function: Box::new(function), arguments },
                         span: e.span(),
                     }
                 },
@@ -653,39 +555,20 @@ where
                 return types.remove(0);
             }
             let state: &mut SimpleState<State> = e.state();
-            Type {
-                id: state.next_id(),
-                kind: TypeKind::Tuple(types),
-                span: e.span(),
-            }
+            Type { id: state.next_id(), kind: TypeKind::Tuple(types), span: e.span() }
         })
         .delimited_by(just(Token::SymLParen), just(Token::SymRParen));
     let variant = constructor
         .then(variant_payload.or_not())
-        .map_with(|(name, payload), e| Variant {
-            name,
-            payload,
-            span: e.span(),
-        })
+        .map_with(|(name, payload), e| Variant { name, payload, span: e.span() })
         .labelled("variant");
     let item_type_decl = just(Token::KeywordType)
         .ignore_then(ident)
         .then_ignore(just(Token::OpAssign))
-        .then(
-            just(Token::OpBitwiseOr).or_not().ignore_then(
-                variant
-                    .separated_by(just(Token::OpBitwiseOr))
-                    .at_least(1)
-                    .collect::<Vec<_>>(),
-            ),
-        )
-        .map(|(name, variants)| {
-            ItemKind::TypeDecl(TypeDecl {
-                name,
-                params: Vec::new(),
-                variants,
-            })
-        })
+        .then(just(Token::OpBitwiseOr).or_not().ignore_then(
+            variant.separated_by(just(Token::OpBitwiseOr)).at_least(1).collect::<Vec<_>>(),
+        ))
+        .map(|(name, variants)| ItemKind::TypeDecl(TypeDecl { name, params: Vec::new(), variants }))
         .labelled("type declaration");
 
     // item_type_alias ::= type ident = ty
@@ -709,16 +592,11 @@ where
             let segment = ident
                 .then_ignore(just(Token::OpCons))
                 .then(import_tree.clone())
-                .map(|(name, child)| ImportTreeKind::Segment {
-                    name,
-                    child: Box::new(child),
-                })
+                .map(|(name, child)| ImportTreeKind::Segment { name, child: Box::new(child) })
                 .labelled("import segment");
 
             // glob ::= *
-            let glob = just(Token::OpMultiply)
-                .to(ImportTreeKind::Glob)
-                .labelled("import glob");
+            let glob = just(Token::OpMultiply).to(ImportTreeKind::Glob).labelled("import glob");
 
             // list ::= { import_tree (, import_tree)* }
             let list = import_tree
@@ -730,12 +608,11 @@ where
                 .map(ImportTreeKind::List)
                 .labelled("import list");
 
-            // `segment` before `item`: both start with an identifier, and `item` would
-            // succeed on `std` alone, leaving `:: {..}` unparsed.
-            choice((segment, item, glob, list)).map_with(|kind, e| ImportTree {
-                kind,
-                span: e.span(),
-            })
+            // `segment` before `item`: both start with an identifier, and
+            // `item` would succeed on `std` alone, leaving `::
+            // {..}` unparsed.
+            choice((segment, item, glob, list))
+                .map_with(|kind, e| ImportTree { kind, span: e.span() })
         }))
         .map(ItemKind::Import)
         .labelled("import tree");
@@ -748,31 +625,21 @@ where
         .map(|(name, expr)| ItemKind::Definition(Definition { name, expr }))
         .labelled("definition");
 
-    // item ::= item_type_decl | item_type_alias | item_import_tree | item_definition
-    // `item_type_decl` first: `type Foo = Bar` is a one-variant sum type, not an alias.
-    let item = choice((
-        item_type_decl,
-        item_type_alias,
-        item_import_tree,
-        item_definition,
-    ))
-    .map_with(|kind, e| {
-        let state: &mut SimpleState<State> = e.state();
-        Item {
-            id: state.next_id(),
-            visibility: Visibility::Inherited,
-            kind,
-            span: e.span(),
-        }
-    });
+    // item ::= item_type_decl | item_type_alias | item_import_tree |
+    // item_definition `item_type_decl` first: `type Foo = Bar` is a
+    // one-variant sum type, not an alias.
+    let item = choice((item_type_decl, item_type_alias, item_import_tree, item_definition))
+        .map_with(|kind, e| {
+            let state: &mut SimpleState<State> = e.state();
+            Item { id: state.next_id(), visibility: Visibility::Inherited, kind, span: e.span() }
+        });
 
     // module ::= item (; item)* ;?
-    item.separated_by(just(Token::SymSemicolon))
-        .allow_trailing()
-        .collect::<Vec<_>>()
+    item.separated_by(just(Token::SymSemicolon)).allow_trailing().collect::<Vec<_>>()
 }
 
-/// Whether a newline after `token` ends the item, like Go's automatic semicolon insertion.
+/// Whether a newline after `token` ends the item, like Go's automatic semicolon
+/// insertion.
 fn ends_item(token: &Token) -> bool {
     matches!(
         token,
@@ -808,14 +675,8 @@ pub fn lex_str<'src>(src: &'src str) -> Vec<Spanned<Token<'src>>> {
     Token::lexer(src)
         .spanned()
         .map(|(tok, span)| match tok {
-            Ok(tok) => Spanned {
-                inner: tok,
-                span: span.into(),
-            },
-            Err(e) => Spanned {
-                inner: Token::Error(e),
-                span: span.into(),
-            },
+            Ok(tok) => Spanned { inner: tok, span: span.into() },
+            Err(e) => Spanned { inner: Token::Error(e), span: span.into() },
         })
         .collect()
 }
@@ -828,8 +689,10 @@ pub fn lex_str<'src>(src: &'src str) -> Vec<Spanned<Token<'src>>> {
 ///
 /// # Returns
 ///
-/// * `Ok(Module)` - If the parsing is successful, returns a `Module` containing the parsed items and a cache.
-/// * `Err(Vec<Rich<Token>>)` - If the parsing fails, returns a vector of rich error messages with token information.
+/// * `Ok(Module)` - If the parsing is successful, returns a `Module` containing
+///   the parsed items and a cache.
+/// * `Err(Vec<Rich<Token>>)` - If the parsing fails, returns a vector of rich
+///   error messages with token information.
 ///
 /// # Example
 ///
@@ -839,10 +702,12 @@ pub fn lex_str<'src>(src: &'src str) -> Vec<Spanned<Token<'src>>> {
 /// println!("Parsed module: {:?}", module);
 /// println!("Parsing errors: {:?}", errors);
 /// ```
-pub fn parse_str<'src>(src: &'src str) -> (Option<Module>, Vec<Rich<'src, Token<'src>>>) {
+pub fn parse_str<'src>(
+    src: &'src str,
+) -> (Option<Module>, Vec<Rich<'src, Token<'src>, kali_ast::Span>>) {
     let mut state: SimpleState<State> = State::default().into();
 
-    let tokens: Vec<(Token, SimpleSpan)> = Token::lexer(src)
+    let tokens: Vec<(Token, kali_ast::Span)> = Token::lexer(src)
         .spanned()
         .map(|(tok, span)| match tok {
             Ok(tok) => (tok, span.into()),
@@ -850,8 +715,9 @@ pub fn parse_str<'src>(src: &'src str) -> (Option<Module>, Vec<Rich<'src, Token<
         })
         .collect();
 
-    // Split comments out into their own table, and turn line ends into `;` where the line
-    // ends an item, unless the next significant token closes a bracket. Go does the same.
+    // Split comments out into their own table, and turn line ends into `;`
+    // where the line ends an item, unless the next significant token closes
+    // a bracket. Go does the same.
     let mut comments = BTreeMap::new();
     let mut significant = Vec::with_capacity(tokens.len());
     let mut previous_ends_item = false;
@@ -863,11 +729,7 @@ pub fn parse_str<'src>(src: &'src str) -> (Option<Module>, Vec<Rich<'src, Token<
                     _ => CommentKind::Doc,
                 };
                 let contents = state.0.rodeo.get_or_intern(contents);
-                let comment = Comment {
-                    contents,
-                    kind,
-                    span: *span,
-                };
+                let comment = Comment { contents, kind, span: *span };
                 comments.insert(*span, comment);
             }
             Token::Newline => {}
@@ -880,14 +742,10 @@ pub fn parse_str<'src>(src: &'src str) -> (Option<Module>, Vec<Rich<'src, Token<
         let next_closes = tokens[index + 1..]
             .iter()
             .map(|(tok, _)| tok)
-            .find(|tok| {
-                !matches!(
-                    tok,
-                    Token::Newline | Token::Comment(_) | Token::DocComment(_)
-                )
-            })
+            .find(|tok| !matches!(tok, Token::Newline | Token::Comment(_) | Token::DocComment(_)))
             .is_some_and(|tok| {
-                // `|` starts a match arm, so a line end before it continues the match.
+                // `|` starts a match arm, so a line end before it continues the
+                // match.
                 matches!(
                     tok,
                     Token::SymRParen | Token::SymRBracket | Token::SymRBrace | Token::OpBitwiseOr
@@ -901,30 +759,23 @@ pub fn parse_str<'src>(src: &'src str) -> (Option<Module>, Vec<Rich<'src, Token<
     let token_stream =
         Stream::from_iter(significant).map((0..src.len()).into(), |(t, s): (_, _)| (t, s));
 
-    let (items, errors) = parser()
-        .parse_with_state(token_stream, &mut state)
-        .into_output_errors();
+    let (items, errors) = parser().parse_with_state(token_stream, &mut state).into_output_errors();
 
-    (
-        items.map(move |items| Module {
-            cache: state.0.rodeo,
-            items,
-            comments,
-        }),
-        errors,
-    )
+    (items.map(move |items| Module { cache: state.0.rodeo, items, comments }), errors)
 }
 
-/// The `kali!` macro is a utility for parsing Rust-like syntax into a `Module` representation.
+/// The `kali!` macro is a utility for parsing Rust-like syntax into a `Module`
+/// representation.
 ///
 /// # Arguments
 ///
-/// * `$($tts:tt)*` - A token tree that represents the input source code to be parsed.
+/// * `$($tts:tt)*` - A token tree that represents the input source code to be
+///   parsed.
 ///
 /// # Returns
 ///
-/// * The macro returns a `Module` object containing the parsed items and a cache. If the parsing fails,
-///   the macro will panic with an error.
+/// * The macro returns a `Module` object containing the parsed items and a
+///   cache. If the parsing fails, the macro will panic with an error.
 ///
 /// # Example
 ///
@@ -937,11 +788,13 @@ pub fn parse_str<'src>(src: &'src str) -> (Option<Module>, Vec<Rich<'src, Token<
 /// println!("{:?}", module);
 /// ```
 ///
-/// In this example, the `kali!` macro parses the input source code `let x = 42;` and returns a `Module` object.
+/// In this example, the `kali!` macro parses the input source code `let x =
+/// 42;` and returns a `Module` object.
 ///
 /// # Panics
 ///
-/// This macro will panic if the parsing fails, which can happen if the input source code contains syntax errors.
+/// This macro will panic if the parsing fails, which can happen if the input
+/// source code contains syntax errors.
 #[macro_export]
 macro_rules! kali {
     ($($tts:tt)*) => {{
