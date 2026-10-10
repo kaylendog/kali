@@ -4,8 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-chumsky = "0.12.0"
-indexmap = "2.13.0"
-lasso = "0.7.3"
+indexmap.workspace = true
+lasso.workspace = true
+strum.workspace = true
 
-strum = { workspace = true }
+chumsky = "0.12.0"

@@ -4,10 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+thiserror.workspace = true
+
 ariadne = "0.4"
 pathdiff = "0.2"
-thiserror = "1.0"
 
-
-kali-parse = { path = "../kali-parse" }
-kali-type = { path = "../kali-type" }
+kali-parse.path = "../kali-parse"
+kali-type.path = "../kali-type"

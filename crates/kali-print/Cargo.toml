@@ -4,12 +4,13 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-thiserror = { workspace = true }
+lasso.workspace = true
+thiserror.workspace = true
 
-kali-ast = { path = "../kali-ast" }
-kali-parse = { path = "../kali-parse" }
-lasso = "0.7.3"
 pretty = "0.12.5"
 
+kali-ast.path = "../kali-ast"
+kali-parse.path = "../kali-parse"
+
 [dev-dependencies]
-pretty_assertions = { workspace = true }
+pretty_assertions.workspace = true
