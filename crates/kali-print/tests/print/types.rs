@@ -7,17 +7,15 @@ fn primitives() {
 
 #[test]
 fn named() {
-    // Lowercase only: an uppercase name on the right is a one-variant sum type, see items.
+    // Lowercase only: an uppercase name on the right is a one-variant sum type,
+    // see items.
     assert_fixed("type P = point\n");
 }
 
 #[test]
 fn composites() {
     assert_fixed("type T = (int, string)\ntype L = [[int]]\ntype R = { x: int, y: [bool] }\n");
-    assert_round_trip(
-        "type R = { x: int, y: bool, }",
-        "type R = { x: int, y: bool }\n",
-    );
+    assert_round_trip("type R = { x: int, y: bool, }", "type R = { x: int, y: bool }\n");
     assert_fixed("type N = [(int, { a: point })]\n");
 }
 

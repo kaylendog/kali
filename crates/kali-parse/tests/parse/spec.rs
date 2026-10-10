@@ -1,6 +1,7 @@
-//! The specification is a fixture: every ```` ```kali ```` block in it must parse. A block
-//! showing syntax the parser does not accept yet is tagged ```` ```kali-planned ```` instead, so
-//! the spec cannot claim syntax the parser rejects without this test failing.
+//! The specification is a fixture: every ```` ```kali ```` block in it must
+//! parse. A block showing syntax the parser does not accept yet is tagged ````
+//! ```kali-planned ```` instead, so the spec cannot claim syntax the parser
+//! rejects without this test failing.
 
 const SPEC: &str = include_str!("../../../../spec/SPECIFICATION.typ");
 

@@ -32,9 +32,7 @@ enum Command {
 fn main() {
     tracing_subscriber::fmt()
         .with_env_filter(
-            EnvFilter::builder()
-                .with_default_directive(LevelFilter::ERROR.into())
-                .from_env_lossy(),
+            EnvFilter::builder().with_default_directive(LevelFilter::ERROR.into()).from_env_lossy(),
         )
         .init();
 

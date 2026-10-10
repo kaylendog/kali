@@ -1,8 +1,9 @@
-//! Width-aware printer built on Wadler-style documents from the `pretty` crate. Each node builds
-//! a `Doc`; `render` lays it out against the configured width.
+//! Width-aware printer built on Wadler-style documents from the `pretty` crate.
+//! Each node builds a `Doc`; `render` lays it out against the configured width.
 //!
-//! Line breaks are only placed where the parser's automatic `;` insertion cannot misread them:
-//! after an operator, a comma, an opening bracket or `->`. Never between a call and its arguments.
+//! Line breaks are only placed where the parser's automatic `;` insertion
+//! cannot misread them: after an operator, a comma, an opening bracket or `->`.
+//! Never between a call and its arguments.
 
 use std::{borrow::Cow, collections::BTreeMap, io};
 
@@ -23,7 +24,8 @@ type Doc = RcDoc<'static, ()>;
 pub struct Settings {
     /// Columns before a group breaks.
     pub width: usize,
-    /// Columns per indentation level. With `tabs`, also the width one tab counts for.
+    /// Columns per indentation level. With `tabs`, also the width one tab
+    /// counts for.
     pub indent: usize,
     /// Indent with tabs instead of spaces.
     pub tabs: bool,
@@ -31,16 +33,12 @@ pub struct Settings {
 
 impl Default for Settings {
     fn default() -> Self {
-        Self {
-            width: 100,
-            indent: 4,
-            tabs: true,
-        }
+        Self { width: 100, indent: 4, tabs: true }
     }
 }
 
-/// State needed to build a module's document: the interner, the source for blank-line
-/// preservation, and the comments attached to each node.
+/// State needed to build a module's document: the interner, the source for
+/// blank-line preservation, and the comments attached to each node.
 pub struct Context<'a> {
     settings: Settings,
     cache: &'a lasso::Rodeo,
@@ -56,12 +54,7 @@ impl<'a> Context<'a> {
         src: &'a str,
         comments: BTreeMap<NodeId, Comments>,
     ) -> Context<'a> {
-        Context {
-            settings,
-            cache,
-            src,
-            comments,
-        }
+        Context { settings, cache, src, comments }
     }
 
     fn indent(&self) -> isize {
@@ -76,8 +69,9 @@ impl<'a> Context<'a> {
         RcDoc::text(self.cache.resolve(key).to_string())
     }
 
-    /// `open` items `close`, on one line if it fits, else one item per line with a trailing
-    /// comma. `pad` puts a space inside the brackets when flat, as in `{ x: int }`.
+    /// `open` items `close`, on one line if it fits, else one item per line
+    /// with a trailing comma. `pad` puts a space inside the brackets when
+    /// flat, as in `{ x: int }`.
     fn delimited(
         &self,
         open: &'static str,
@@ -92,10 +86,7 @@ impl<'a> Context<'a> {
         self.text(open)
             .append(
                 edge()
-                    .append(RcDoc::intersperse(
-                        items,
-                        self.text(",").append(RcDoc::line()),
-                    ))
+                    .append(RcDoc::intersperse(items, self.text(",").append(RcDoc::line())))
                     .append(self.text(",").flat_alt(RcDoc::nil()))
                     .nest(self.indent()),
             )
@@ -112,14 +103,12 @@ impl<'a> Context<'a> {
             .append(self.text("}"))
     }
 
-    /// The right-hand side of `=` or `->`: an expression that breaks anyway, or one that can
-    /// break inside its own brackets, hugs the operator. Anything else may move to the next
-    /// line, indented.
+    /// The right-hand side of `=` or `->`: an expression that breaks anyway, or
+    /// one that can break inside its own brackets, hugs the operator.
+    /// Anything else may move to the next line, indented.
     fn rhs(&self, expr: &Expr, doc: Doc) -> Doc {
-        let bracketed = matches!(
-            expr.kind,
-            ExprKind::Tuple(_) | ExprKind::List(_) | ExprKind::Record { .. }
-        );
+        let bracketed =
+            matches!(expr.kind, ExprKind::Tuple(_) | ExprKind::List(_) | ExprKind::Record { .. });
         if bracketed || has_hard_break(expr) {
             RcDoc::space().append(doc)
         } else {
@@ -127,13 +116,11 @@ impl<'a> Context<'a> {
         }
     }
 
-    /// The separator between two things that were at `from..to` in the source: a space on the
-    /// same line, a newline, or one blank line for two or more. `at_least` forces a minimum.
+    /// The separator between two things that were at `from..to` in the source:
+    /// a space on the same line, a newline, or one blank line for two or
+    /// more. `at_least` forces a minimum.
     fn gap(&self, from: usize, to: usize, at_least: usize) -> Doc {
-        let newlines = self
-            .src
-            .get(from..to)
-            .map_or(1, |text| text.matches('\n').count());
+        let newlines = self.src.get(from..to).map_or(1, |text| text.matches('\n').count());
         match newlines.max(at_least) {
             0 => RcDoc::space(),
             1 => RcDoc::hardline(),
@@ -142,18 +129,18 @@ impl<'a> Context<'a> {
     }
 }
 
-/// Whether `expr` prints with a hard line break, so no group containing it can be laid out flat.
-/// `match` and `if` always break; anything else breaks if an operand does.
+/// Whether `expr` prints with a hard line break, so no group containing it can
+/// be laid out flat. `match` and `if` always break; anything else breaks if an
+/// operand does.
 fn has_hard_break(expr: &Expr) -> bool {
     match &expr.kind {
         ExprKind::Match { .. } | ExprKind::Conditional { .. } => true,
         ExprKind::Lambda { body, .. } => has_hard_break(body),
         ExprKind::UnaryExpr { expr, .. } => has_hard_break(expr),
         ExprKind::BinaryExpr { lhs, rhs, .. } => has_hard_break(lhs) || has_hard_break(rhs),
-        ExprKind::Call {
-            function,
-            arguments,
-        } => has_hard_break(function) || arguments.iter().any(has_hard_break),
+        ExprKind::Call { function, arguments } => {
+            has_hard_break(function) || arguments.iter().any(has_hard_break)
+        }
         ExprKind::Tuple(exprs) | ExprKind::List(exprs) => exprs.iter().any(has_hard_break),
         ExprKind::Record { fields } => fields.values().any(has_hard_break),
         ExprKind::Literal(_) | ExprKind::Var(_) => false,
@@ -196,8 +183,9 @@ impl PrettyPrint for Comment {
 
 impl PrettyPrint for Module {
     fn pretty_print(&self, ctx: &mut Context) -> Doc {
-        // Source offset where the last printed thing ended. `None` until something is printed,
-        // so blank lines at the top of the file are dropped.
+        // Source offset where the last printed thing ended. `None` until
+        // something is printed, so blank lines at the top of the file
+        // are dropped.
         let mut last_end: Option<usize> = None;
         let mut out = RcDoc::nil();
         let mut place = |ctx: &Context, out: Doc, doc: Doc, start: usize, end: usize, at_least| {
@@ -218,18 +206,18 @@ impl PrettyPrint for Module {
             // Line ends separate items, so an item always starts a new line.
             let doc = item.pretty_print(ctx);
             out = place(ctx, out, doc, item.span.start, item.span.end, 1);
-            // Dangling comments have no slot of their own yet, so they follow the item.
+            // Dangling comments have no slot of their own yet, so they follow
+            // the item.
             for comment in &comments.dangling {
-                out = out
-                    .append(RcDoc::hardline())
-                    .append(comment.pretty_print(ctx));
+                out = out.append(RcDoc::hardline()).append(comment.pretty_print(ctx));
             }
             for comment in &comments.trailing {
                 let doc = comment.pretty_print(ctx);
                 out = place(ctx, out, doc, comment.span.start, comment.span.end, 0);
             }
         }
-        // With no items, the comments pass has nothing to attach the comments to.
+        // With no items, the comments pass has nothing to attach the comments
+        // to.
         if self.items.is_empty() {
             for comment in self.comments.values() {
                 let doc = comment.pretty_print(ctx);
@@ -251,11 +239,7 @@ impl PrettyPrint for Item {
             ItemKind::TypeDecl(decl) => decl.pretty_print(ctx),
             ItemKind::Import(import) => ctx.text("import ").append(import.pretty_print(ctx)),
         };
-        if self.visibility == Visibility::Exported {
-            ctx.text("export ").append(doc)
-        } else {
-            doc
-        }
+        if self.visibility == Visibility::Exported { ctx.text("export ").append(doc) } else { doc }
     }
 }
 
@@ -280,17 +264,15 @@ impl PrettyPrint for TypeAlias {
 
 impl PrettyPrint for TypeDecl {
     fn pretty_print(&self, ctx: &mut Context) -> Doc {
-        // `type S = A | B` when it fits, else one variant per line, each after a leading `|`.
+        // `type S = A | B` when it fits, else one variant per line, each after
+        // a leading `|`.
         let variants = self
             .variants
             .iter()
             .enumerate()
             .map(|(index, variant)| {
-                let pipe = if index == 0 {
-                    ctx.text("| ").flat_alt(RcDoc::nil())
-                } else {
-                    ctx.text("| ")
-                };
+                let pipe =
+                    if index == 0 { ctx.text("| ").flat_alt(RcDoc::nil()) } else { ctx.text("| ") };
                 RcDoc::line().append(pipe).append(variant.pretty_print(ctx))
             })
             .collect::<Vec<_>>();
@@ -303,7 +285,8 @@ impl PrettyPrint for TypeDecl {
 
 impl PrettyPrint for Variant {
     fn pretty_print(&self, ctx: &mut Context) -> Doc {
-        // `Rectangle(int, int)` is one tuple payload, printed without double parens.
+        // `Rectangle(int, int)` is one tuple payload, printed without double
+        // parens.
         let payload = match self.payload.as_ref().map(|ty| &ty.kind) {
             None => RcDoc::nil(),
             Some(TypeKind::Tuple(types)) => {
@@ -325,17 +308,14 @@ impl PrettyPrint for ImportTree {
             ImportTreeKind::Item { name, alias } => {
                 let name = name.pretty_print(ctx);
                 match alias {
-                    Some(alias) => name
-                        .append(ctx.text(" as "))
-                        .append(alias.pretty_print(ctx)),
+                    Some(alias) => name.append(ctx.text(" as ")).append(alias.pretty_print(ctx)),
                     None => name,
                 }
             }
             // Rust style: `std::io::{read, write}`, no spaces around `::` or inside braces.
-            ImportTreeKind::Segment { name, child } => name
-                .pretty_print(ctx)
-                .append(ctx.text("::"))
-                .append(child.pretty_print(ctx)),
+            ImportTreeKind::Segment { name, child } => {
+                name.pretty_print(ctx).append(ctx.text("::")).append(child.pretty_print(ctx))
+            }
             ImportTreeKind::Glob => ctx.text("*"),
             ImportTreeKind::List(trees) => {
                 let trees = trees.iter().map(|tree| tree.pretty_print(ctx)).collect();
@@ -362,17 +342,12 @@ impl PrettyPrint for Type {
                 let types = types.iter().map(|ty| ty.pretty_print(ctx)).collect();
                 ctx.delimited("(", ")", false, types)
             }
-            TypeKind::List(ty) => ctx
-                .text("[")
-                .append(ty.pretty_print(ctx))
-                .append(ctx.text("]")),
+            TypeKind::List(ty) => ctx.text("[").append(ty.pretty_print(ctx)).append(ctx.text("]")),
             TypeKind::Record(fields) => {
                 let fields = fields
                     .iter()
                     .map(|(name, ty)| {
-                        name.pretty_print(ctx)
-                            .append(ctx.text(": "))
-                            .append(ty.pretty_print(ctx))
+                        name.pretty_print(ctx).append(ctx.text(": ")).append(ty.pretty_print(ctx))
                     })
                     .collect();
                 ctx.delimited("{", "}", true, fields)
@@ -389,8 +364,9 @@ impl PrettyPrint for Type {
 
 // --- Precedence ---
 //
-// Binding powers mirror the pratt tables in the parser. A child is parenthesised when its
-// binding power is below the minimum its position requires.
+// Binding powers mirror the pratt tables in the parser. A child is
+// parenthesised when its binding power is below the minimum its position
+// requires.
 
 #[derive(Clone, Copy)]
 enum Assoc {
@@ -451,11 +427,7 @@ fn pattern_precedence(pattern: &Pattern) -> (u8, Assoc) {
 /// Prints `child`, parenthesised if its binding power is below `minimum`.
 fn print_child<T: PrettyPrint>(ctx: &mut Context, child: &T, precedence: u8, minimum: u8) -> Doc {
     let doc = child.pretty_print(ctx);
-    if precedence < minimum {
-        ctx.text("(").append(doc).append(ctx.text(")"))
-    } else {
-        doc
-    }
+    if precedence < minimum { ctx.text("(").append(doc).append(ctx.text(")")) } else { doc }
 }
 
 // --- Patterns and destructors ---
@@ -541,19 +513,18 @@ impl PrettyPrint for Destructor {
                         let name = name.pretty_print(ctx);
                         // `{ x }` is shorthand for `{ x: x }`.
                         match destructor {
-                            Some(destructor) => name
-                                .append(ctx.text(": "))
-                                .append(destructor.pretty_print(ctx)),
+                            Some(destructor) => {
+                                name.append(ctx.text(": ")).append(destructor.pretty_print(ctx))
+                            }
                             None => name,
                         }
                     })
                     .collect();
                 ctx.delimited("{", "}", true, fields)
             }
-            DestructorKind::Cons { lhs, rhs } => lhs
-                .pretty_print(ctx)
-                .append(ctx.text(" :: "))
-                .append(rhs.pretty_print(ctx)),
+            DestructorKind::Cons { lhs, rhs } => {
+                lhs.pretty_print(ctx).append(ctx.text(" :: ")).append(rhs.pretty_print(ctx))
+            }
         }
     }
 }
@@ -571,9 +542,11 @@ impl PrettyPrint for Expr {
             ExprKind::BinaryExpr { op, lhs, rhs } => {
                 let (precedence, assoc) = binary_op(op.kind);
                 let (lhs_min, rhs_min) = operand_minimums(precedence, assoc);
-                // The break goes after the operator: an operator at the end of a line continues
-                // the item, an operand at the end of a line terminates it. An operand that
-                // breaks anyway, such as a `match`, keeps the operator on its line.
+                // The break goes after the operator: an operator at the end of
+                // a line continues the item, an operand at the
+                // end of a line terminates it. An operand that
+                // breaks anyway, such as a `match`, keeps the operator on its
+                // line.
                 let separator = if has_hard_break(lhs) || has_hard_break(rhs) {
                     RcDoc::space()
                 } else {
@@ -581,18 +554,14 @@ impl PrettyPrint for Expr {
                 };
                 operand(ctx, lhs, lhs_min)
                     .append(ctx.text(format!(" {}", op.kind)))
-                    .append(
-                        separator
-                            .append(operand(ctx, rhs, rhs_min))
-                            .nest(ctx.indent()),
-                    )
+                    .append(separator.append(operand(ctx, rhs, rhs_min)).nest(ctx.indent()))
                     .group()
             }
             ExprKind::UnaryExpr { op, expr } => {
-                // Always parenthesise a compound operand: `-f y` reads as `(-f) y` to anyone
-                // used to OCaml, so print `-(f y)` even though the parser needs no parens.
-                ctx.text(op.kind.to_string())
-                    .append(operand(ctx, expr, ATOM))
+                // Always parenthesise a compound operand: `-f y` reads as `(-f)
+                // y` to anyone used to OCaml, so print `-(f y)`
+                // even though the parser needs no parens.
+                ctx.text(op.kind.to_string()).append(operand(ctx, expr, ATOM))
             }
             ExprKind::Tuple(exprs) => {
                 let exprs = exprs.iter().map(|expr| expr.pretty_print(ctx)).collect();
@@ -606,18 +575,12 @@ impl PrettyPrint for Expr {
                 let fields = fields
                     .iter()
                     .map(|(name, expr)| {
-                        name.pretty_print(ctx)
-                            .append(ctx.text(": "))
-                            .append(expr.pretty_print(ctx))
+                        name.pretty_print(ctx).append(ctx.text(": ")).append(expr.pretty_print(ctx))
                     })
                     .collect();
                 ctx.delimited("{", "}", true, fields)
             }
-            ExprKind::Conditional {
-                condition,
-                body,
-                otherwise,
-            } => {
+            ExprKind::Conditional { condition, body, otherwise } => {
                 let body = body.pretty_print(ctx);
                 let mut doc = ctx
                     .text("if ")
@@ -627,7 +590,8 @@ impl PrettyPrint for Expr {
                 if let Some(otherwise) = otherwise {
                     let otherwise_doc = otherwise.pretty_print(ctx);
                     doc = doc.append(ctx.text(" else "));
-                    // `else { if .. }` prints as `else if ..`, so chains stay flat.
+                    // `else { if .. }` prints as `else if ..`, so chains stay
+                    // flat.
                     doc = if matches!(otherwise.kind, ExprKind::Conditional { .. }) {
                         doc.append(otherwise_doc)
                     } else {
@@ -640,9 +604,7 @@ impl PrettyPrint for Expr {
                 let arms = arms
                     .iter()
                     .map(|arm| {
-                        RcDoc::hardline()
-                            .append(ctx.text("| "))
-                            .append(arm.pretty_print(ctx))
+                        RcDoc::hardline().append(ctx.text("| ")).append(arm.pretty_print(ctx))
                     })
                     .collect::<Vec<_>>();
                 ctx.text("match ")
@@ -654,25 +616,20 @@ impl PrettyPrint for Expr {
             }
             // ponytail: `ret_ty` is dropped. The parser has no grammar for lambda return types yet.
             ExprKind::Lambda { params, body, .. } => {
-                let params = params
-                    .iter()
-                    .map(|param| param.pretty_print(ctx))
-                    .collect::<Vec<_>>();
+                let params = params.iter().map(|param| param.pretty_print(ctx)).collect::<Vec<_>>();
                 let body_doc = operand(ctx, body, LAMBDA);
                 RcDoc::intersperse(params, RcDoc::space())
                     .append(ctx.text(" ->"))
                     .append(ctx.rhs(body, body_doc))
             }
-            ExprKind::Call {
-                function,
-                arguments,
-            } => {
+            ExprKind::Call { function, arguments } => {
                 // Never breaks: a newline after an argument would end the item.
                 let function = operand(ctx, function, CALL).append(RcDoc::space());
                 if arguments.is_empty() {
                     return function.append(ctx.text("()"));
                 }
-                // Arguments must be atoms, so anything with an operator is parenthesised.
+                // Arguments must be atoms, so anything with an operator is
+                // parenthesised.
                 let arguments = arguments
                     .iter()
                     .map(|argument| operand(ctx, argument, ATOM))
@@ -700,18 +657,16 @@ impl PrettyPrint for LambdaParam {
 impl PrettyPrint for MatchArm {
     fn pretty_print(&self, ctx: &mut Context) -> Doc {
         let expr = self.expr.pretty_print(ctx);
-        self.pattern
-            .pretty_print(ctx)
-            .append(ctx.text(" ->"))
-            .append(ctx.rhs(&self.expr, expr))
+        self.pattern.pretty_print(ctx).append(ctx.text(" ->")).append(ctx.rhs(&self.expr, expr))
     }
 }
 
 // --- Rendering ---
 
-/// Writes a document to an `io::Write`, turning the spaces `pretty` emits after each newline
-/// into tabs. Indentation arrives as its own `write_str` call straight after the `"\n"`, so a
-/// run of spaces anywhere else, such as inside a string literal, is left alone.
+/// Writes a document to an `io::Write`, turning the spaces `pretty` emits after
+/// each newline into tabs. Indentation arrives as its own `write_str` call
+/// straight after the `"\n"`, so a run of spaces anywhere else, such as inside
+/// a string literal, is left alone.
 struct Writer<'w> {
     out: &'w mut dyn io::Write,
     indent: usize,
@@ -753,11 +708,7 @@ impl RenderAnnotated<'_, ()> for Writer<'_> {
 
 /// Lays out `doc` against `settings.width` and writes it to `out`.
 pub(crate) fn render(doc: &Doc, settings: Settings, out: &mut dyn io::Write) -> io::Result<()> {
-    let mut writer = Writer {
-        out,
-        indent: settings.indent.max(1),
-        tabs: settings.tabs,
-        after_newline: false,
-    };
+    let mut writer =
+        Writer { out, indent: settings.indent.max(1), tabs: settings.tabs, after_newline: false };
     doc.render_raw(settings.width, &mut writer)
 }

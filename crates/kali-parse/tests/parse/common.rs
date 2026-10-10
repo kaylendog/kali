@@ -14,8 +14,9 @@ pub fn rejects(src: &str) {
     assert!(!errors.is_empty(), "{src:?} parsed but should not");
 }
 
-/// Parses `src` as the right-hand side of a definition and renders it as an s-expression, so
-/// grouping can be asserted independently of the printer's precedence table.
+/// Parses `src` as the right-hand side of a definition and renders it as an
+/// s-expression, so grouping can be asserted independently of the printer's
+/// precedence table.
 pub fn sexp(src: &str) -> String {
     let module = parses(&format!("let it = {src}"));
     let ItemKind::Definition(Definition { expr, .. }) = &module.items[0].kind else {
@@ -39,11 +40,7 @@ pub fn pattern_sexp(src: &str) -> String {
 fn render_pattern(pattern: &Pattern, module: &Module) -> String {
     let name = |ident: &kali_ast::Ident| module.cache.resolve(&ident.key).to_string();
     let many = |patterns: &[Pattern]| {
-        patterns
-            .iter()
-            .map(|pattern| render_pattern(pattern, module))
-            .collect::<Vec<_>>()
-            .join(" ")
+        patterns.iter().map(|pattern| render_pattern(pattern, module)).collect::<Vec<_>>().join(" ")
     };
     match &pattern.kind {
         PatternKind::Var(ident) => name(ident),
@@ -53,23 +50,12 @@ fn render_pattern(pattern: &Pattern, module: &Module) -> String {
         PatternKind::EmptyList => "[]".into(),
         PatternKind::Tuple(patterns) => format!("(tuple {})", many(patterns)),
         PatternKind::Cons { lhs, rhs } => {
-            format!(
-                "(:: {} {})",
-                render_pattern(lhs, module),
-                render_pattern(rhs, module)
-            )
+            format!("(:: {} {})", render_pattern(lhs, module), render_pattern(rhs, module))
         }
         PatternKind::Or { lhs, rhs } => {
-            format!(
-                "(| {} {})",
-                render_pattern(lhs, module),
-                render_pattern(rhs, module)
-            )
+            format!("(| {} {})", render_pattern(lhs, module), render_pattern(rhs, module))
         }
-        PatternKind::Constructor {
-            name: ctor,
-            payload,
-        } => match payload {
+        PatternKind::Constructor { name: ctor, payload } => match payload {
             Some(payload) => format!("({} {})", name(ctor), render_pattern(payload, module)),
             None => name(ctor),
         },
@@ -87,18 +73,10 @@ fn render(expr: &Expr, module: &Module) -> String {
         ExprKind::Literal(LiteralKind::String(key)) => format!("{:?}", module.cache.resolve(key)),
         ExprKind::Literal(LiteralKind::Unit) => "()".into(),
         ExprKind::BinaryExpr { op, lhs, rhs } => {
-            format!(
-                "({} {} {})",
-                op.kind,
-                render(lhs, module),
-                render(rhs, module)
-            )
+            format!("({} {} {})", op.kind, render(lhs, module), render(rhs, module))
         }
         ExprKind::UnaryExpr { op, expr } => format!("({} {})", op.kind, render(expr, module)),
-        ExprKind::Call {
-            function,
-            arguments,
-        } => {
+        ExprKind::Call { function, arguments } => {
             let arguments = arguments
                 .iter()
                 .map(|argument| render(argument, module))
@@ -110,16 +88,8 @@ fn render(expr: &Expr, module: &Module) -> String {
             format!("(lambda {} {})", params.len(), render(body, module))
         }
         ExprKind::Tuple(items) | ExprKind::List(items) => {
-            let open = if matches!(expr.kind, ExprKind::Tuple(_)) {
-                "(tuple"
-            } else {
-                "(list"
-            };
-            let items = items
-                .iter()
-                .map(|item| render(item, module))
-                .collect::<Vec<_>>()
-                .join(" ");
+            let open = if matches!(expr.kind, ExprKind::Tuple(_)) { "(tuple" } else { "(list" };
+            let items = items.iter().map(|item| render(item, module)).collect::<Vec<_>>().join(" ");
             format!("{open} {items})")
         }
         other => format!("<{}>", std::any::type_name_of_val(other)),

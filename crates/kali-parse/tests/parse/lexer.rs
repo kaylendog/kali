@@ -15,11 +15,7 @@ fn tokens(src: &str) -> Vec<Token<'_>> {
 fn integers() {
     assert_eq!(
         tokens("0 42 1_000_000"),
-        vec![
-            Token::LitInteger(0),
-            Token::LitInteger(42),
-            Token::LitInteger(1_000_000),
-        ]
+        vec![Token::LitInteger(0), Token::LitInteger(42), Token::LitInteger(1_000_000),]
     );
     assert_eq!(
         tokens("0xff 0xF_F 0b1010 0o17 0d10"),
@@ -38,50 +34,30 @@ fn integers() {
 fn floats() {
     assert_eq!(
         tokens("0.0 3.14 1_000.000_001"),
-        vec![
-            Token::LitFloat(0.0),
-            Token::LitFloat(3.14),
-            Token::LitFloat(1_000.000_001),
-        ]
+        vec![Token::LitFloat(0.0), Token::LitFloat(3.14), Token::LitFloat(1_000.000_001),]
     );
     assert_eq!(
         tokens("1e10 2E-5 3.14e+2"),
-        vec![
-            Token::LitFloat(1e10),
-            Token::LitFloat(2e-5),
-            Token::LitFloat(3.14e2),
-        ]
+        vec![Token::LitFloat(1e10), Token::LitFloat(2e-5), Token::LitFloat(3.14e2),]
     );
 }
 
 #[test]
 fn integer_overflow_is_an_error() {
     assert!(matches!(tokens("9223372036854775808")[0], Token::Error(_)));
-    assert!(matches!(
-        tokens("0x1_0000_0000_0000_0000")[0],
-        Token::Error(_)
-    ));
-    assert_eq!(
-        tokens("9223372036854775807"),
-        vec![Token::LitInteger(i64::MAX)]
-    );
+    assert!(matches!(tokens("0x1_0000_0000_0000_0000")[0], Token::Error(_)));
+    assert_eq!(tokens("9223372036854775807"), vec![Token::LitInteger(i64::MAX)]);
 }
 
 #[test]
 fn minus_is_always_an_operator() {
-    assert_eq!(
-        tokens("n-1"),
-        vec![Token::Ident("n"), Token::OpSubtract, Token::LitInteger(1),]
-    );
+    assert_eq!(tokens("n-1"), vec![Token::Ident("n"), Token::OpSubtract, Token::LitInteger(1),]);
     assert_eq!(tokens("-5"), vec![Token::OpSubtract, Token::LitInteger(5)]);
 }
 
 #[test]
 fn strings() {
-    assert_eq!(
-        tokens(r#""Hello, world!""#),
-        vec![Token::LitString("Hello, world!")]
-    );
+    assert_eq!(tokens(r#""Hello, world!""#), vec![Token::LitString("Hello, world!")]);
     assert_eq!(tokens(r#""""#), vec![Token::LitString("")]);
     assert_eq!(
         tokens(r#""こんにちは世界" "😊""#),
@@ -109,10 +85,7 @@ fn identifiers() {
         ]
     );
     // Keywords only match whole words.
-    assert_eq!(
-        tokens("iffy lettuce"),
-        vec![Token::Ident("iffy"), Token::Ident("lettuce"),]
-    );
+    assert_eq!(tokens("iffy lettuce"), vec![Token::Ident("iffy"), Token::Ident("lettuce"),]);
     assert_eq!(tokens("_"), vec![Token::SymWildcard]);
 }
 
@@ -207,11 +180,7 @@ fn comments_run_to_end_of_line() {
 fn whitespace_and_newlines() {
     assert_eq!(
         tokens("1 \t 2\r\n3"),
-        vec![
-            Token::LitInteger(1),
-            Token::LitInteger(2),
-            Token::LitInteger(3),
-        ]
+        vec![Token::LitInteger(1), Token::LitInteger(2), Token::LitInteger(3),]
     );
     let newlines = kali_parse::lex_str("1\n\n2")
         .into_iter()

@@ -230,7 +230,8 @@ pub enum LexicalError {
     InvalidToken,
 }
 
-/// Parse an integer literal with a base prefix (0x, 0b, 0o, 0d) and ensure it is valid.
+/// Parse an integer literal with a base prefix (0x, 0b, 0o, 0d) and ensure it
+/// is valid.
 fn prefixed_integer<'src>(lex: &mut logos::Lexer<'src, Token<'src>>) -> Result<i64, LexicalError> {
     let slice = lex.slice();
     let radix = match &slice[..2] {
@@ -250,15 +251,8 @@ fn prefixed_integer<'src>(lex: &mut logos::Lexer<'src, Token<'src>>) -> Result<i
 
 /// Parse a float literal and ensure it is finite.
 fn finite_float<'src>(lex: &mut logos::Lexer<'src, Token<'src>>) -> Result<f64, LexicalError> {
-    let value: f64 = lex
-        .slice()
-        .replace('_', "")
-        .parse()
-        .expect("matched by the regex");
-    value
-        .is_finite()
-        .then_some(value)
-        .ok_or(LexicalError::FloatOutOfRange)
+    let value: f64 = lex.slice().replace('_', "").parse().expect("matched by the regex");
+    value.is_finite().then_some(value).ok_or(LexicalError::FloatOutOfRange)
 }
 
 fn comment<'src>(lex: &mut logos::Lexer<'src, Token<'src>>) -> Option<&'src str> {

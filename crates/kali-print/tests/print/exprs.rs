@@ -13,10 +13,7 @@ fn literals() {
 #[test]
 fn tuples_and_lists() {
     assert_fixed("let t = (1, 2, 3)\nlet n = ((1, 2), 3)\nlet l = [1, [2, 3], []]\n");
-    assert_round_trip(
-        "let t = (1, 2,)\nlet l = [1,]",
-        "let t = (1, 2)\nlet l = [1]\n",
-    );
+    assert_round_trip("let t = (1, 2,)\nlet l = [1,]", "let t = (1, 2)\nlet l = [1]\n");
 }
 
 #[test]
@@ -90,7 +87,8 @@ fn conditional() {
         "let x = if a < b {\n\ta\n} else {\n\tb\n}\n",
     );
     assert_round_trip("let x = if a { b }", "let x = if a {\n\tb\n}\n");
-    // `else { if .. }` and `else if ..` are the same tree and print as a flat chain.
+    // `else { if .. }` and `else if ..` are the same tree and print as a flat
+    // chain.
     assert_round_trip(
         "let x = if a { b } else { if c { d } else { e } }",
         "let x = if a {\n\tb\n} else if c {\n\td\n} else {\n\te\n}\n",
@@ -123,7 +121,8 @@ fn nested_match_is_closed_by_braces() {
 
 #[test]
 fn match_as_operand_needs_no_parentheses() {
-    // The braces delimit the match, so `(match ..) + 1` and `match .. + 1` parse the same.
+    // The braces delimit the match, so `(match ..) + 1` and `match .. + 1`
+    // parse the same.
     assert_round_trip(
         "let x = (match a {\n\t| 0 -> 1\n}) + 1\n",
         "let x = match a {\n\t| 0 -> 1\n} + 1\n",

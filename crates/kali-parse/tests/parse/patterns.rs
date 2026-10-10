@@ -62,10 +62,7 @@ fn constructors() {
     assert_eq!(pattern_sexp("Rectangle(w, h)"), "(Rectangle (tuple w h))");
     assert_eq!(pattern_sexp("Rectangle(w, h,)"), "(Rectangle (tuple w h))");
     assert_eq!(pattern_sexp("Some(Circle(r))"), "(Some (Circle r))");
-    assert_eq!(
-        pattern_sexp("Pair((a, b), c)"),
-        "(Pair (tuple (tuple a b) c))"
-    );
+    assert_eq!(pattern_sexp("Pair((a, b), c)"), "(Pair (tuple (tuple a b) c))");
     assert_eq!(pattern_sexp("Some(x) | None"), "(| (Some x) None)");
     rejects_pattern("Circle()");
     rejects_pattern("Circle r");

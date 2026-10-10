@@ -2,7 +2,8 @@ use crate::common::{assert_fixed, assert_round_trip};
 
 #[test]
 fn imports() {
-    // Rust style: no spaces around `::` or inside braces. Spaced input is accepted.
+    // Rust style: no spaces around `::` or inside braces. Spaced input is
+    // accepted.
     assert_fixed("import a\nimport a as b\nimport a::*\nimport a::b::c\n");
     assert_fixed("import a::{b, c as d, e::*}\n");
     assert_round_trip("import a :: { b, }", "import a::{b}\n");

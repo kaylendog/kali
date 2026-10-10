@@ -1,7 +1,7 @@
-use ariadne::{sources, Color, Label, Report, ReportKind};
 use std::{ops::Range, path::PathBuf};
 
 use anyhow::{Context, Result};
+use ariadne::{sources, Color, Label, Report, ReportKind};
 use clap::Subcommand;
 use kali_parse::{chumsky::error::Rich, Token};
 
@@ -44,13 +44,9 @@ fn parse(path: PathBuf) -> Result<()> {
     let (module, errors) = kali_parse::parse_str(&src);
     let path = path.display().to_string();
     if !errors.is_empty() {
-        build_report(path.clone(), &errors)
-            .iter()
-            .for_each(|report| {
-                report
-                    .eprint(sources([(path.clone(), src.clone())]))
-                    .unwrap();
-            });
+        build_report(path.clone(), &errors).iter().for_each(|report| {
+            report.eprint(sources([(path.clone(), src.clone())])).unwrap();
+        });
     }
     println!("{:#?}", module);
 
@@ -76,23 +72,20 @@ fn build_report<'src>(
 ) -> Vec<Report<'src, (String, Range<usize>)>> {
     errs.iter()
         .map(|e| {
-            Report::build(
-                ReportKind::Error,
-                (filename.as_ref().to_owned(), e.span().into_range()),
-            )
-            .with_config(ariadne::Config::new().with_index_type(ariadne::IndexType::Byte))
-            .with_message(e.to_string())
-            .with_label(
-                Label::new((filename.as_ref().to_owned(), e.span().into_range()))
-                    .with_message(e.reason().to_string())
-                    .with_color(Color::Red),
-            )
-            .with_labels(e.contexts().map(|(label, span)| {
-                Label::new((filename.as_ref().to_owned(), span.into_range()))
-                    .with_message(format!("while parsing this {label}"))
-                    .with_color(Color::Yellow)
-            }))
-            .finish()
+            Report::build(ReportKind::Error, (filename.as_ref().to_owned(), e.span().into_range()))
+                .with_config(ariadne::Config::new().with_index_type(ariadne::IndexType::Byte))
+                .with_message(e.to_string())
+                .with_label(
+                    Label::new((filename.as_ref().to_owned(), e.span().into_range()))
+                        .with_message(e.reason().to_string())
+                        .with_color(Color::Red),
+                )
+                .with_labels(e.contexts().map(|(label, span)| {
+                    Label::new((filename.as_ref().to_owned(), span.into_range()))
+                        .with_message(format!("while parsing this {label}"))
+                        .with_color(Color::Yellow)
+                }))
+                .finish()
         })
         .collect()
 }

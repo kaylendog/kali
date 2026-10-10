@@ -1,5 +1,5 @@
-//! Printer tests. One module per grammar nonterminal; a test lives in the module of the
-//! outermost construct its input exercises.
+//! Printer tests. One module per grammar nonterminal; a test lives in the
+//! module of the outermost construct its input exercises.
 
 mod common;
 

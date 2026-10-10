@@ -23,7 +23,8 @@ fn comment_only_module() {
 
 #[test]
 fn dangling_comments_follow_the_item_for_now() {
-    // Comments inside an item have no slot yet, so the printer moves them after it.
+    // Comments inside an item have no slot yet, so the printer moves them after
+    // it.
     assert_round_trip(
         "let x = match a {\n\t// zero\n\t| 0 -> 1\n\t| _ -> 2\n}\n",
         "let x = match a {\n\t| 0 -> 1\n\t| _ -> 2\n}\n// zero\n",

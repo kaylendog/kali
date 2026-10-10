@@ -67,10 +67,7 @@ fn line_ends_continue_open_constructs() {
     assert_eq!(item_count("let x = [1, 2\n]"), 1);
     assert_eq!(item_count("let x = (\n\t1, 2\n)"), 1);
     assert_eq!(item_count("let x = f (\n\ta)"), 1);
-    assert_eq!(
-        item_count("let x = match a {\n\t| 0 -> 1\n\t| _ -> 2\n}"),
-        1
-    );
+    assert_eq!(item_count("let x = match a {\n\t| 0 -> 1\n\t| _ -> 2\n}"), 1);
     assert_eq!(item_count("let x = if a {\n\tb\n} else {\n\tc\n}"), 1);
     assert_eq!(item_count("type S =\n\t| A\n\t| B"), 1);
     assert_eq!(item_count("let f = a ->\n\ta + 1"), 1);

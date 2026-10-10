@@ -31,18 +31,12 @@ fn line_ending_in_operator_continues() {
 
 #[test]
 fn line_ending_in_open_bracket_continues() {
-    assert_round_trip(
-        "let x = (\n\t1, 2)\nlet y = f (\n\ta)",
-        "let x = (1, 2)\nlet y = f a\n",
-    );
+    assert_round_trip("let x = (\n\t1, 2)\nlet y = f (\n\ta)", "let x = (1, 2)\nlet y = f a\n");
 }
 
 #[test]
 fn line_before_closing_bracket_continues() {
-    assert_round_trip(
-        "let x = [1, 2\n]\nlet y = (a, b\n)",
-        "let x = [1, 2]\nlet y = (a, b)\n",
-    );
+    assert_round_trip("let x = [1, 2\n]\nlet y = (a, b\n)", "let x = [1, 2]\nlet y = (a, b)\n");
 }
 
 #[test]

@@ -14,9 +14,7 @@ fn patterns() {
 
 #[test]
 fn literal_patterns() {
-    assert_fixed(&arms(
-        "\t| true -> 1\n\t| \"s\" -> 2\n\t| () -> 3\n\t| -1 -> 4\n\t| -2.5 -> 5\n",
-    ));
+    assert_fixed(&arms("\t| true -> 1\n\t| \"s\" -> 2\n\t| () -> 3\n\t| -1 -> 4\n\t| -2.5 -> 5\n"));
 }
 
 #[test]
@@ -28,9 +26,7 @@ fn constructor_patterns() {
 
 #[test]
 fn nested_patterns() {
-    assert_fixed(&arms(
-        "\t| (a, (b, _)) :: rest -> 0\n\t| { p: (a, b), q: [] } -> 1\n",
-    ));
+    assert_fixed(&arms("\t| (a, (b, _)) :: rest -> 0\n\t| { p: (a, b), q: [] } -> 1\n"));
 }
 
 #[test]

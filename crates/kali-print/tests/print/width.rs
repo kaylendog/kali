@@ -1,24 +1,17 @@
-//! Layout at a narrow width. Everything else in this suite fits on one line at the default
-//! width, so only these tests exercise line breaking.
+//! Layout at a narrow width. Everything else in this suite fits on one line at
+//! the default width, so only these tests exercise line breaking.
 
 use kali_print::Settings;
 
 use crate::common::{assert_eq, print_with};
 
-const NARROW: Settings = Settings {
-    width: 30,
-    indent: 4,
-    tabs: true,
-};
+const NARROW: Settings = Settings { width: 30, indent: 4, tabs: true };
 
-/// Printing `src` at [`NARROW`] gives `expected`, and printing that again gives it back.
+/// Printing `src` at [`NARROW`] gives `expected`, and printing that again gives
+/// it back.
 fn assert_wraps(src: &str, expected: &str) {
     assert_eq!(print_with(src, NARROW), expected, "first print of {src:?}");
-    assert_eq!(
-        print_with(expected, NARROW),
-        expected,
-        "reprint of {expected:?}"
-    );
+    assert_eq!(print_with(expected, NARROW), expected, "reprint of {expected:?}");
 }
 
 #[test]
@@ -40,15 +33,13 @@ fn lists_break_one_per_line_with_trailing_comma() {
 
 #[test]
 fn definitions_break_after_the_equals() {
-    assert_wraps(
-        "let total = alpha + beta + gamma\n",
-        "let total =\n\talpha + beta + gamma\n",
-    );
+    assert_wraps("let total = alpha + beta + gamma\n", "let total =\n\talpha + beta + gamma\n");
 }
 
 #[test]
 fn operators_stay_at_line_ends() {
-    // `+` at the end of a line continues the item; an operand at the end would terminate it.
+    // `+` at the end of a line continues the item; an operand at the end would
+    // terminate it.
     assert_wraps(
         "let t = aaaaaaaa + bbbbbbbb + cccccccc + dddddddd\n",
         "let t =\n\taaaaaaaa + bbbbbbbb +\n\t\tcccccccc +\n\t\tdddddddd\n",
