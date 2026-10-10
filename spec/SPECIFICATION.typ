@@ -354,7 +354,7 @@ let result = match value {
 }
 ```
 
-Each arm starts with `|`, followed by a pattern, the `->` symbol, and an expression to evaluate if the pattern matches. The braces close the match, so nested matches need no extra parentheses. The `_` pattern is a catch-all that matches any value not matched by previous patterns.
+Arms are separated by `|`, and the `|` before the first arm is optional, as in a sum type. Each arm is a pattern, the `->` symbol, and an expression to evaluate if the pattern matches. The formatter writes one arm per line, each after a `|`. The braces close the match, so nested matches need no extra parentheses. The `_` pattern is a catch-all that matches any value not matched by previous patterns.
 
 Patterns can destructure tuples, arrays, and records, and match on literals:
 

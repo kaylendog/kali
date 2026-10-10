@@ -430,26 +430,31 @@ where
         })
         .labelled("if expression");
 
-        // match_expr ::= match expr { (| pattern -> expr)+ }
+        // match_expr ::= match expr { |? arm (| arm)* }
+        // arm ::= pattern -> expr
+        let arm = pattern
+            .clone()
+            .then_ignore(just(Token::SymArrow))
+            .then(expr.clone())
+            .map_with(|(pattern, expr), e| {
+                let state: &mut SimpleState<State> = e.state();
+                MatchArm {
+                    id: state.next_id(),
+                    pattern,
+                    expr,
+                    span: e.span(),
+                }
+            });
         let atom_match = just(Token::KeywordMatch)
             .ignore_then(expr.clone())
             .then(
                 just(Token::OpBitwiseOr)
-                    .ignore_then(pattern.clone())
-                    .then_ignore(just(Token::SymArrow))
-                    .then(expr.clone())
-                    .map_with(|(pattern, expr), e| {
-                        let state: &mut SimpleState<State> = e.state();
-                        MatchArm {
-                            id: state.next_id(),
-                            pattern,
-                            expr,
-                            span: e.span(),
-                        }
-                    })
-                    .repeated()
-                    .at_least(1)
-                    .collect::<Vec<_>>()
+                    .or_not()
+                    .ignore_then(
+                        arm.separated_by(just(Token::OpBitwiseOr))
+                            .at_least(1)
+                            .collect::<Vec<_>>(),
+                    )
                     .delimited_by(just(Token::SymLBrace), just(Token::SymRBrace)),
             )
             .map(|(value, arms)| ExprKind::Match {

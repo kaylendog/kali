@@ -122,8 +122,29 @@ fn conditionals() {
 fn matches() {
     parses("let x = match a { | 0 -> 1 | _ -> 2 }");
     rejects("let x = match a { }");
-    rejects("let x = match a { 0 -> 1 }");
     rejects("let x = match a with | 0 -> 1");
+    rejects("let x = match a { | 0 -> 1 | }");
+}
+
+#[test]
+fn leading_pipe_is_optional() {
+    assert_eq!(arm_count("match a { 0 -> 1 }"), 1);
+    assert_eq!(arm_count("match a { 0 -> 1 | _ -> 2 }"), 2);
+    assert_eq!(arm_count("match a {\n\t0 -> 1\n\t| _ -> 2\n}"), 2);
+    // An or-pattern's `|` and the arm separator are told apart by the `->`.
+    assert_eq!(arm_count("match a { 0 | 1 -> x | 2 -> y }"), 2);
+    assert_eq!(arm_count("match a { | 0 | 1 -> x | 2 | 3 -> y }"), 2);
+}
+
+fn arm_count(src: &str) -> usize {
+    let module = parses(&format!("let it = {src}"));
+    let kali_ast::ItemKind::Definition(definition) = &module.items[0].kind else {
+        panic!("expected a definition");
+    };
+    let kali_ast::ExprKind::Match { arms, .. } = &definition.expr.kind else {
+        panic!("expected a match");
+    };
+    arms.len()
 }
 
 #[test]

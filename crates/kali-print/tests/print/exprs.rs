@@ -108,6 +108,13 @@ fn fib() {
 }
 
 #[test]
+fn leading_pipe_is_added() {
+    let expected = "let x = match a {\n\t| 0 -> 1\n\t| _ -> 2\n}\n";
+    assert_round_trip("let x = match a { 0 -> 1 | _ -> 2 }", expected);
+    assert_round_trip("let x = match a {\n\t0 -> 1\n\t| _ -> 2\n}", expected);
+}
+
+#[test]
 fn nested_match_is_closed_by_braces() {
     assert_fixed(
         "let m = a b -> match a {\n\t| 0 -> b\n\t| x -> match b {\n\t\t| 0 -> a\n\t\t| y -> x + y\n\t}\n}\n",
