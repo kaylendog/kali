@@ -149,6 +149,13 @@ pub struct Scheme {
     pub constraints: Vec<(TypeVar, Constraint)>,
 }
 
+impl Scheme {
+    /// Returns the constraint associated with the given type variable, if any.
+    pub fn constraint_of(&self, var: &TypeVar) -> Option<&Constraint> {
+        self.constraints.iter().find_map(|(v, c)| (v == var).then_some(c))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use pretty_assertions::assert_eq;

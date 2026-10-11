@@ -1,8 +1,8 @@
-use std::cmp::Ordering;
+use std::{cmp::Ordering, collections::BTreeMap};
 
 use crate::{
     error::{Error, ErrorKind, Origin},
-    types::{Constraint, Type, TypeVar},
+    types::{Constraint, Scheme, Type, TypeVar},
 };
 
 /// The state of a [`VarType``] during inference.
@@ -308,11 +308,108 @@ impl Infer {
             Type::Int | Type::Float | Type::Bool | Type::String | Type::Unit | Type::Error => {}
         }
     }
+
+    // --- Schemes ---
+
+    /// Enter a new scope level. This is used to track which variables are
+    fn enter(&mut self) {
+        self.level += 1;
+    }
+
+    /// Exit the current scope level. This is used to track which variables are
+    fn exit(&mut self) {
+        self.level -= 1;
+    }
+
+    /// Generalise a type into a scheme by quantifying over all unbound
+    /// variables
+    fn generalise(&mut self, ty: &Type) -> Scheme {
+        let ty = self.zonk(ty);
+
+        // Walk the type and collect all unbound variables that are at a level
+        // greater than the current level.
+        let mut vars = Vec::new();
+        self.collect_vars(&ty, &mut vars);
+
+        // Collect the constraints of the unbound variables.
+        let constraints = vars
+            .iter()
+            .filter_map(|var| self.constraint_of(var).map(|constraint| (var.clone(), *constraint)))
+            .collect();
+
+        Scheme { vars, constraints, ty }
+    }
+
+    /// Recursively collect all unbound variables in `ty` that are at a level
+    /// greater than the current level.
+    fn collect_vars(&mut self, ty: &Type, vars: &mut Vec<TypeVar>) {
+        match ty {
+            Type::Tuple(items) => items.iter().for_each(|item| self.collect_vars(item, vars)),
+            Type::List(ty) => self.collect_vars(ty, vars),
+            Type::Record(entries) => entries.values().for_each(|ty| self.collect_vars(ty, vars)),
+            Type::Fn(arg, ret) => {
+                self.collect_vars(arg, vars);
+                self.collect_vars(ret, vars);
+            }
+            Type::Var(var) => {
+                if let Some(level) = self.level_of(var) {
+                    // `level_of` only returns Some if the var is unbound, so we
+                    // don't need to check that here.
+                    if level > self.level && !vars.contains(var) {
+                        vars.push(var.clone());
+                    }
+                }
+            }
+            Type::Int | Type::Float | Type::Bool | Type::String | Type::Unit | Type::Error => {}
+        }
+    }
+
+    /// Instantiate a scheme by replacing its quantified variables with fresh
+    /// unbound variables.
+    fn instantiate(&mut self, scheme: &Scheme) -> Type {
+        // Create a mapping from the scheme's vars to fresh unbound vars.
+        let mut vars = BTreeMap::new();
+        for var in &scheme.vars {
+            // Apply the constraint of the scheme's var to the fresh var, if
+            // any.
+            let fresh = if let Some(constraint) = scheme.constraint_of(var) {
+                self.fresh_constrained(*constraint)
+            } else {
+                self.fresh()
+            };
+            vars.insert(var.clone(), fresh);
+        }
+
+        // Replace the scheme's vars in the type with the fresh vars.
+        self.replace_vars(&scheme.ty, &vars)
+    }
+
+    /// Recursively replace variables in `ty` according to `vars`.
+    fn replace_vars(&mut self, ty: &Type, vars: &BTreeMap<TypeVar, Type>) -> Type {
+        match ty {
+            // Base cases
+            Type::Var(var) => vars.get(var).cloned().unwrap_or_else(|| Type::Var(var.clone())),
+            Type::Int | Type::Float | Type::Bool | Type::String | Type::Unit | Type::Error => {
+                ty.clone()
+            }
+            // Composite types
+            Type::Tuple(items) => {
+                Type::Tuple(items.iter().map(|item| self.replace_vars(item, vars)).collect())
+            }
+            Type::List(ty) => Type::List(Box::new(self.replace_vars(ty, vars))),
+            Type::Record(entries) => Type::Record(
+                entries.iter().map(|(name, ty)| (*name, self.replace_vars(ty, vars))).collect(),
+            ),
+            Type::Fn(arg, ret) => {
+                Type::Fn(self.replace_vars(arg, vars).into(), self.replace_vars(ret, vars).into())
+            }
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use pretty_assertions::assert_eq;
+    use pretty_assertions::{assert_eq, assert_ne};
 
     use crate::{
         error::{Error, ErrorKind, Origin},
@@ -482,5 +579,60 @@ mod tests {
         assert_eq!(Type::Int, infer.unify(&unknown1, &Type::Int, Origin::Empty));
         assert_eq!(Type::Int, infer.unify(&unknown2, &unknown1, Origin::Empty));
         assert_eq!(Type::Int, infer.zonk(&unknown2));
+    }
+
+    #[test]
+    fn generalise_quantifies_inner_vars_only() {
+        let mut infer = Infer::default();
+
+        // Create an outer and inner variable
+        let outer = infer.fresh();
+        infer.enter();
+        let inner = infer.fresh();
+        infer.exit();
+
+        // Generalising a function type that uses both variables should only quantify the inner variable.
+        let scheme = infer.generalise(&Type::Fn(inner.clone().into(), outer.clone().into()));
+        assert_eq!(vec![inner.as_var().unwrap()], scheme.vars);
+    }
+
+    #[test]
+    fn generalise_skips_vars_unified_with_the_outer_scope() {
+        let mut infer = Infer::default();
+
+        // Create an outer and inner variable, then unify them.
+        let outer = infer.fresh();
+        infer.enter();
+        let inner = infer.fresh();
+        infer.unify(&inner, &outer, Origin::Empty);
+        infer.exit();
+
+        // Generalising the inner variable should not quantify it, since it is unified with the outer variable.
+        assert!(infer.generalise(&inner).vars.is_empty());
+    }
+
+    #[test]
+    fn instansiate_is_fresh() {
+        let mut infer = Infer::default();
+
+        // Construct a scheme with a numeric constraint on the parameter and a
+        // fresh return type.
+        infer.enter();
+        let param = infer.fresh_constrained(Constraint::Num);
+        let return_ty = infer.fresh();
+        infer.exit();
+        let scheme = infer.generalise(&Type::Fn(param.into(), return_ty.into()));
+        assert_eq!(2, scheme.vars.len());
+
+        // Instantiate the scheme twice and check that the two instances are
+        // different ...
+        let inst1 = infer.instantiate(&scheme);
+        let inst2 = infer.instantiate(&scheme);
+        assert_ne!(inst1, inst2);
+
+        // ... but that they both satisfy the constraints of the original
+        // scheme.
+        let Type::Fn(param, _) = &inst1 else { panic!() };
+        assert_eq!(Some(&Constraint::Num), infer.constraint_of(&param.as_var().unwrap()));
     }
 }
