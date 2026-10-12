@@ -40,25 +40,29 @@ pub struct Infer {
     /// The current scope level. Only variables with level greater than this
     /// value are available.
     level: usize,
+    /// The environment of type schemes.
+    env: Vec<BTreeMap<lasso::Spur, Scheme>>,
+    /// Type aliases.
+    pub aliases: BTreeMap<lasso::Spur, Type>,
     /// Errors collected during inferrence.
     pub errors: Vec<Error>,
 }
 
 impl Infer {
     /// Create a new unbound variable.
-    fn fresh(&mut self) -> Type {
+    pub(crate) fn fresh(&mut self) -> Type {
         self.vars.push(VarState::Unbound { level: self.level, constraint: None });
         Type::Var(TypeVar(self.vars.len() - 1))
     }
 
     /// Create a new unbound variable with a constraint.
-    fn fresh_constrained(&mut self, constraint: Constraint) -> Type {
+    pub(crate) fn fresh_constrained(&mut self, constraint: Constraint) -> Type {
         self.vars.push(VarState::Unbound { level: self.level, constraint: Some(constraint) });
         Type::Var(TypeVar(self.vars.len() - 1))
     }
 
     /// Get the level of a type variable, if it is unbound.
-    fn level_of(&self, var: &TypeVar) -> Option<usize> {
+    pub(crate) fn level_of(&self, var: &TypeVar) -> Option<usize> {
         match &self.vars[var.0] {
             VarState::Unbound { level, .. } => Some(*level),
             VarState::Bound(_) => None,
@@ -66,7 +70,7 @@ impl Infer {
     }
 
     /// Get the constraint of a type variable, if it is unbound.
-    fn constraint_of(&self, var: &TypeVar) -> Option<&Constraint> {
+    pub(crate) fn constraint_of(&self, var: &TypeVar) -> Option<&Constraint> {
         match &self.vars[var.0] {
             VarState::Unbound { constraint, .. } => constraint.as_ref(),
             VarState::Bound(_) => None,
@@ -76,7 +80,7 @@ impl Infer {
     // --- Resolution ---
 
     /// Follow a bound variable one hop. Anything else is returned as is.
-    fn resolve(&self, ty: &Type) -> Type {
+    pub(crate) fn resolve(&self, ty: &Type) -> Type {
         match ty {
             Type::Var(var) => match &self.vars[var.0] {
                 VarState::Unbound { .. } => ty.clone(),
@@ -87,7 +91,7 @@ impl Infer {
     }
 
     /// Resolve all variables in the given type as far as possible.
-    fn zonk(&self, ty: &Type) -> Type {
+    pub(crate) fn zonk(&self, ty: &Type) -> Type {
         match ty {
             Type::Tuple(items) => Type::Tuple(items.iter().map(|item| self.zonk(item)).collect()),
             Type::List(ty) => Type::List(Box::new(self.zonk(ty))),
@@ -110,7 +114,7 @@ impl Infer {
     // --- Unification ---
 
     /// Unify two types.
-    fn unify(&mut self, lhs: &Type, rhs: &Type, origin: Origin) -> Type {
+    pub(crate) fn unify(&mut self, lhs: &Type, rhs: &Type, origin: Origin) -> Type {
         // Zonk both sides to ensure we are working with the most concrete types
         // possible.
         match (self.zonk(lhs), self.zonk(rhs)) {
@@ -209,11 +213,11 @@ impl Infer {
                 }
 
                 // Bind the dropped var to the kept var.
-                self.bind(&drop, Type::Var(keep), origin)
+                self.bind_var(&drop, Type::Var(keep), origin)
             }
             // Unifying concrete types with a var binds them.
             (Type::Var(var), actual) | (actual, Type::Var(var)) => {
-                self.bind(&var, actual.clone(), origin)
+                self.bind_var(&var, actual.clone(), origin)
             }
             // Propagate existing errors upwards.
             (Type::Error, _) | (_, Type::Error) => Type::Error,
@@ -230,7 +234,7 @@ impl Infer {
 
     /// Bind a type variable to a concrete type, performing the occurs check and
     /// constraint satisfaction.
-    fn bind(&mut self, var: &TypeVar, concrete: Type, origin: Origin) -> Type {
+    pub(crate) fn bind_var(&mut self, var: &TypeVar, concrete: Type, origin: Origin) -> Type {
         // Check for infinite types.
         if self.occurs(var, &concrete) {
             self.errors.push(Error { kind: ErrorKind::InfiniteType, origin });
@@ -264,7 +268,7 @@ impl Infer {
 
     /// Check if a type variable occurs in a type, which would indicate an
     /// infinite type.
-    fn occurs(&self, var: &TypeVar, ty: &Type) -> bool {
+    pub(crate) fn occurs(&self, var: &TypeVar, ty: &Type) -> bool {
         match ty {
             // Base cases
             Type::Var(other) if other == var => true,
@@ -287,7 +291,7 @@ impl Infer {
     /// a variable is bound to `ty`: anything reachable from it now belongs
     /// to the binder's scope, so it must not be generalised by an inner
     /// scope.
-    fn adjust_level(&mut self, ty: &Type, new_level: usize) {
+    pub(crate) fn adjust_level(&mut self, ty: &Type, new_level: usize) {
         match ty {
             Type::Tuple(items) => items.iter().for_each(|item| self.adjust_level(item, new_level)),
             Type::List(ty) => self.adjust_level(ty, new_level),
@@ -312,18 +316,18 @@ impl Infer {
     // --- Schemes ---
 
     /// Enter a new scope level. This is used to track which variables are
-    fn enter(&mut self) {
+    pub(crate) fn enter(&mut self) {
         self.level += 1;
     }
 
     /// Exit the current scope level. This is used to track which variables are
-    fn exit(&mut self) {
+    pub(crate) fn exit(&mut self) {
         self.level -= 1;
     }
 
     /// Generalise a type into a scheme by quantifying over all unbound
     /// variables
-    fn generalise(&mut self, ty: &Type) -> Scheme {
+    pub(crate) fn generalise(&mut self, ty: &Type) -> Scheme {
         let ty = self.zonk(ty);
 
         // Walk the type and collect all unbound variables that are at a level
@@ -342,7 +346,7 @@ impl Infer {
 
     /// Recursively collect all unbound variables in `ty` that are at a level
     /// greater than the current level.
-    fn collect_vars(&mut self, ty: &Type, vars: &mut Vec<TypeVar>) {
+    pub(crate) fn collect_vars(&mut self, ty: &Type, vars: &mut Vec<TypeVar>) {
         match ty {
             Type::Tuple(items) => items.iter().for_each(|item| self.collect_vars(item, vars)),
             Type::List(ty) => self.collect_vars(ty, vars),
@@ -366,7 +370,7 @@ impl Infer {
 
     /// Instantiate a scheme by replacing its quantified variables with fresh
     /// unbound variables.
-    fn instantiate(&mut self, scheme: &Scheme) -> Type {
+    pub(crate) fn instantiate(&mut self, scheme: &Scheme) -> Type {
         // Create a mapping from the scheme's vars to fresh unbound vars.
         let mut vars = BTreeMap::new();
         for var in &scheme.vars {
@@ -385,7 +389,7 @@ impl Infer {
     }
 
     /// Recursively replace variables in `ty` according to `vars`.
-    fn replace_vars(&mut self, ty: &Type, vars: &BTreeMap<TypeVar, Type>) -> Type {
+    pub(crate) fn replace_vars(&mut self, ty: &Type, vars: &BTreeMap<TypeVar, Type>) -> Type {
         match ty {
             // Base cases
             Type::Var(var) => vars.get(var).cloned().unwrap_or_else(|| Type::Var(var.clone())),
@@ -403,6 +407,33 @@ impl Infer {
             Type::Fn(arg, ret) => {
                 Type::Fn(self.replace_vars(arg, vars).into(), self.replace_vars(ret, vars).into())
             }
+        }
+    }
+
+    // --- Environment ---
+
+    /// Push a new scope onto the environment stack.
+    pub(crate) fn push(&mut self) {
+        self.env.push(BTreeMap::new());
+    }
+
+    /// Pop the top scope off the environment stack.
+    pub(crate) fn pop(&mut self) -> Option<BTreeMap<lasso::Spur, Scheme>> {
+        self.env.pop()
+    }
+
+    /// Lookup an aliased type. These are available in all scopes, so we don't need to check the environment stack.
+    pub(crate) fn lookup(&self, name: lasso::Spur) -> Option<&Type> {
+        self.aliases.get(&name)
+    }
+
+    /// Bind a type scheme to a name in the innermost scope of the environment
+    /// stack.
+    pub(crate) fn bind_scheme(&mut self, name: lasso::Spur, scheme: Scheme) -> Option<Scheme> {
+        if let Some(scope) = self.env.last_mut() {
+            scope.insert(name, scheme)
+        } else {
+            None
         }
     }
 }
@@ -591,7 +622,8 @@ mod tests {
         let inner = infer.fresh();
         infer.exit();
 
-        // Generalising a function type that uses both variables should only quantify the inner variable.
+        // Generalising a function type that uses both variables should only
+        // quantify the inner variable.
         let scheme = infer.generalise(&Type::Fn(inner.clone().into(), outer.clone().into()));
         assert_eq!(vec![inner.as_var().unwrap()], scheme.vars);
     }
@@ -607,7 +639,8 @@ mod tests {
         infer.unify(&inner, &outer, Origin::Empty);
         infer.exit();
 
-        // Generalising the inner variable should not quantify it, since it is unified with the outer variable.
+        // Generalising the inner variable should not quantify it, since it is
+        // unified with the outer variable.
         assert!(infer.generalise(&inner).vars.is_empty());
     }
 

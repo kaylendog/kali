@@ -765,7 +765,8 @@ pub fn parse_str<'src>(
 }
 
 /// The `kali!` macro is a utility for parsing Rust-like syntax into a `Module`
-/// representation.
+/// representation. Note that semicolons are necessary to terminate items, since Rust macros
+/// ignore newlines.
 ///
 /// # Arguments
 ///
@@ -800,5 +801,20 @@ macro_rules! kali {
     ($($tts:tt)*) => {{
         let input = stringify!($($tts)*);
         $crate::parse_str(input)
+    }};
+}
+
+/// Like the `kali!` macro, but panics on parse errors. This is useful for tests and
+/// examples where you want to ensure that the input is valid and don't want to
+/// handle errors explicitly.
+#[macro_export]
+macro_rules! kali_unwrap {
+    ($($tts:tt)*) => {{
+        let input = stringify!($($tts)*);
+        let (module, errors) = $crate::parse_str(input);
+        if !errors.is_empty() {
+            panic!("Parsing failed with errors: {:?}", errors);
+        }
+        module.expect("Parsing failed, but no errors were reported")
     }};
 }

@@ -96,6 +96,28 @@ pub enum ItemKind {
     Definition(Definition),
 }
 
+impl ItemKind {
+    /// Return the [`ImportTree`] if this item is an import, otherwise return `None`.
+    pub fn as_import(&self) -> Option<&ImportTree> {
+        if let ItemKind::Import(tree) = self { Some(tree) } else { None }
+    }
+
+    /// Return the [`TypeAlias`] if this item is a type alias, otherwise return `None`.
+    pub fn as_type_alias(&self) -> Option<&TypeAlias> {
+        if let ItemKind::TypeAlias(alias) = self { Some(alias) } else { None }
+    }
+
+    /// Return the [`TypeDecl`] if this item is a type declaration, otherwise return `None`.
+    pub fn as_type_decl(&self) -> Option<&TypeDecl> {
+        if let ItemKind::TypeDecl(decl) = self { Some(decl) } else { None }
+    }
+
+    /// Return the [`Definition`] if this item is a definition, otherwise return `None`.
+    pub fn as_definition(&self) -> Option<&Definition> {
+        if let ItemKind::Definition(def) = self { Some(def) } else { None }
+    }
+}
+
 /// Represents the visibility of an item in the source code.
 #[derive(Debug, Clone, Eq, PartialEq, Default)]
 pub enum Visibility {
