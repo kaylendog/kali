@@ -1,7 +1,12 @@
 use std::{collections::BTreeMap, hash::Hash};
 
+use kali_macros::Node;
+
 mod span;
+mod traits;
 mod visit;
+
+use traits::Node;
 
 pub use span::Span;
 pub use visit::{Visitor, WalkOrder, Walker};
@@ -27,11 +32,15 @@ pub type NodeId = u32;
 
 /// Represents an identifier in the source code, including its textual value and
 /// span.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Node)]
 pub struct Ident {
+    /// A unique identifier for the identifier in the abstract syntax tree (AST).
+    #[id]
+    pub id: NodeId,
     /// The index of the identifier in the table.
     pub key: lasso::Spur,
     /// The span of the identifier in the source code.
+    #[span]
     pub span: Span,
 }
 
@@ -71,11 +80,13 @@ pub enum CommentKind {
 
 /// Represents an item in the source code, such as a function, struct, or
 /// module.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Node)]
 pub struct Item {
     /// A unique identifier for the item in the abstract syntax tree (AST).
+    #[id]
     pub id: NodeId,
     /// The span of the item in the source code.
+    #[span]
     pub span: Span,
     /// The kind of the item (e.g., function, struct, etc.).
     pub kind: ItemKind,
@@ -97,22 +108,26 @@ pub enum ItemKind {
 }
 
 impl ItemKind {
-    /// Return the [`ImportTree`] if this item is an import, otherwise return `None`.
+    /// Return the [`ImportTree`] if this item is an import, otherwise return
+    /// `None`.
     pub fn as_import(&self) -> Option<&ImportTree> {
         if let ItemKind::Import(tree) = self { Some(tree) } else { None }
     }
 
-    /// Return the [`TypeAlias`] if this item is a type alias, otherwise return `None`.
+    /// Return the [`TypeAlias`] if this item is a type alias, otherwise return
+    /// `None`.
     pub fn as_type_alias(&self) -> Option<&TypeAlias> {
         if let ItemKind::TypeAlias(alias) = self { Some(alias) } else { None }
     }
 
-    /// Return the [`TypeDecl`] if this item is a type declaration, otherwise return `None`.
+    /// Return the [`TypeDecl`] if this item is a type declaration, otherwise
+    /// return `None`.
     pub fn as_type_decl(&self) -> Option<&TypeDecl> {
         if let ItemKind::TypeDecl(decl) = self { Some(decl) } else { None }
     }
 
-    /// Return the [`Definition`] if this item is a definition, otherwise return `None`.
+    /// Return the [`Definition`] if this item is a definition, otherwise return
+    /// `None`.
     pub fn as_definition(&self) -> Option<&Definition> {
         if let ItemKind::Definition(def) = self { Some(def) } else { None }
     }
@@ -131,11 +146,15 @@ pub enum Visibility {
 }
 
 /// A node in an import tree.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Node)]
 pub struct ImportTree {
+    /// A unique identifier for the import tree in the abstract syntax tree (AST).
+    #[id]
+    pub id: NodeId,
     /// The kind of the import tree.
     pub kind: ImportTreeKind,
     /// The span of the import tree in the source code.
+    #[span]
     pub span: Span,
 }
 
@@ -185,23 +204,29 @@ pub struct TypeDecl {
 
 /// One variant of a sum type. Its constructor is a function from the payload to
 /// the type.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Node)]
 pub struct Variant {
+    /// A unique identifier for the variant in the abstract syntax tree (AST).
+    #[id]
+    pub id: NodeId,
     /// The constructor name.
     pub name: Ident,
     /// The payload type. `Circle(int)` is `int`, `Rectangle(int, int)` is a
     /// tuple, `Point` is none.
     pub payload: Option<Type>,
     /// The span of the variant in the source code.
+    #[span]
     pub span: Span,
 }
 
 /// Represents a type in the source code, including its span and kind.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Node)]
 pub struct Type {
     /// A unique identifier for the type in the abstract syntax tree (AST).
+    #[id]
     pub id: NodeId,
     /// The span of the type in the source code.
+    #[span]
     pub span: Span,
     /// The kind of type (primitive, function, tuple, etc.).
     pub kind: TypeKind,
@@ -249,11 +274,13 @@ pub struct Definition {
 }
 
 /// Represents an expression item in the source code.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Node)]
 pub struct Expr {
     /// A unique identifier for the expression in the abstract syntax tree
     /// (AST).
+    #[id]
     pub id: NodeId,
+    #[span]
     /// The span of the expression in the source code.
     pub span: Span,
     /// The kind of expression.
@@ -338,11 +365,15 @@ pub enum LiteralKind {
 
 /// Represents a binary operator in the source code, including its kind and
 /// span.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Node)]
 pub struct BinaryOp {
+    /// A unique identifier for the binary operator in the abstract syntax tree (AST).
+    #[id]
+    pub id: NodeId,
     /// The kind of binary operator (e.g., addition, subtraction, etc.).
     pub kind: BinaryOpKind,
     /// The span of the binary operator in the source code.
+    #[span]
     pub span: Span,
 }
 
@@ -394,11 +425,15 @@ pub enum BinaryOpKind {
 }
 
 /// Represents a unary operator in the source code, including its kind and span.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Node)]
 pub struct UnaryOp {
+    /// A unique identifier for the unary operator in the abstract syntax tree (AST).
+    #[id]
+    pub id: NodeId,
     /// The kind of unary operator (e.g., negation, logical not, bitwise not).
     pub kind: UnaryOpKind,
     /// The span of the unary operator in the source code.
+    #[span]
     pub span: Span,
 }
 
@@ -420,11 +455,13 @@ pub enum UnaryOpKind {
 }
 
 /// Represents a single arm of a match expression.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Node)]
 pub struct MatchArm {
     /// A unique identifier for the arm in the abstract syntax tree (AST).
+    #[id]
     pub id: NodeId,
     /// The span of the match arm in the source code.
+    #[span]
     pub span: Span,
     /// The pattern to match.
     pub pattern: Pattern,
@@ -433,11 +470,13 @@ pub struct MatchArm {
 }
 
 /// Represents the kind of pattern in a match arm.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Node)]
 pub struct Pattern {
     /// A unique identifier for the pattern in the abstract syntax tree (AST).
+    #[id]
     pub id: NodeId,
     /// The span of the pattern in the source code.
+    #[span]
     pub span: Span,
     /// The kind of pattern (literal, identifier, tuple, etc.).
     pub kind: PatternKind,
@@ -484,12 +523,14 @@ pub struct LambdaParam {
 
 /// Represents a destructor pattern, which is a pattern with only free
 /// variables.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Node)]
 pub struct Destructor {
     /// A unique identifier for the destructor in the abstract syntax tree
     /// (AST).
+    #[id]
     pub id: NodeId,
     /// The span of the destructor in the source code.
+    #[span]
     pub span: Span,
     /// THe kind of destructor.
     pub kind: DestructorKind,

@@ -52,7 +52,7 @@ fn binary_op<'src, I>(
 where
     I: ValueInput<'src, Token = Token<'src>, Span = kali_ast::Span>,
 {
-    op.map_with(|kind, e| BinaryOp { kind, span: e.span() }).boxed()
+    op.map_with(|kind, e| BinaryOp { id: e.state().next_id(), kind, span: e.span() }).boxed()
 }
 
 /// Shorthand function to construct a [`BinaryExpr`].
@@ -80,7 +80,7 @@ where
     let ident = select! { Token::Ident(ident) => ident }
         .map_with(|ident, e| {
             let state: &mut SimpleState<State> = e.state();
-            Ident { key: state.rodeo.get_or_intern(ident), span: e.span() }
+            Ident { id: state.next_id(), key: state.rodeo.get_or_intern(ident), span: e.span() }
         })
         .labelled("identifier");
 
@@ -90,7 +90,7 @@ where
     }
     .map_with(|name, e| {
         let state: &mut SimpleState<State> = e.state();
-        Ident { key: state.rodeo.get_or_intern(name), span: e.span() }
+        Ident { id: state.next_id(), key: state.rodeo.get_or_intern(name), span: e.span() }
     })
     .labelled("constructor");
 
@@ -444,7 +444,10 @@ where
                      Token::OpNegate => UnaryOpKind::LogicalNot,
                      Token::OpSubtract => UnaryOpKind::Negate,
                 }
-                .map_with(|kind, e| UnaryOp { kind, span: e.span() }),
+                .map_with(|kind, e| {
+                    let state: &mut SimpleState<State> = e.state();
+                    UnaryOp { id: state.next_id(), kind, span: e.span() }
+                }),
                 |op, expr, e| {
                     let state: &mut SimpleState<State> = e.state();
                     Expr {
@@ -560,7 +563,12 @@ where
         .delimited_by(just(Token::SymLParen), just(Token::SymRParen));
     let variant = constructor
         .then(variant_payload.or_not())
-        .map_with(|(name, payload), e| Variant { name, payload, span: e.span() })
+        .map_with(|(name, payload), e| Variant {
+            id: e.state().next_id(),
+            name,
+            payload,
+            span: e.span(),
+        })
         .labelled("variant");
     let item_type_decl = just(Token::KeywordType)
         .ignore_then(ident)
@@ -611,8 +619,11 @@ where
             // `segment` before `item`: both start with an identifier, and
             // `item` would succeed on `std` alone, leaving `::
             // {..}` unparsed.
-            choice((segment, item, glob, list))
-                .map_with(|kind, e| ImportTree { kind, span: e.span() })
+            choice((segment, item, glob, list)).map_with(|kind, e| ImportTree {
+                id: e.state().next_id(),
+                kind,
+                span: e.span(),
+            })
         }))
         .map(ItemKind::Import)
         .labelled("import tree");
@@ -765,8 +776,8 @@ pub fn parse_str<'src>(
 }
 
 /// The `kali!` macro is a utility for parsing Rust-like syntax into a `Module`
-/// representation. Note that semicolons are necessary to terminate items, since Rust macros
-/// ignore newlines.
+/// representation. Note that semicolons are necessary to terminate items, since
+/// Rust macros ignore newlines.
 ///
 /// # Arguments
 ///
@@ -804,9 +815,9 @@ macro_rules! kali {
     }};
 }
 
-/// Like the `kali!` macro, but panics on parse errors. This is useful for tests and
-/// examples where you want to ensure that the input is valid and don't want to
-/// handle errors explicitly.
+/// Like the `kali!` macro, but panics on parse errors. This is useful for tests
+/// and examples where you want to ensure that the input is valid and don't want
+/// to handle errors explicitly.
 #[macro_export]
 macro_rules! kali_unwrap {
     ($($tts:tt)*) => {{
