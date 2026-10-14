@@ -6,9 +6,8 @@ mod span;
 mod traits;
 mod visit;
 
-use traits::Node;
-
 pub use span::Span;
+pub use traits::Node;
 pub use visit::{Visitor, WalkOrder, Walker};
 
 /// Represents a module in the source code, containing a collection of items and
@@ -34,7 +33,8 @@ pub type NodeId = u32;
 /// span.
 #[derive(Debug, Clone, Copy, Node)]
 pub struct Ident {
-    /// A unique identifier for the identifier in the abstract syntax tree (AST).
+    /// A unique identifier for the identifier in the abstract syntax tree
+    /// (AST).
     #[id]
     pub id: NodeId,
     /// The index of the identifier in the table.
@@ -148,7 +148,8 @@ pub enum Visibility {
 /// A node in an import tree.
 #[derive(Debug, Clone, Node)]
 pub struct ImportTree {
-    /// A unique identifier for the import tree in the abstract syntax tree (AST).
+    /// A unique identifier for the import tree in the abstract syntax tree
+    /// (AST).
     #[id]
     pub id: NodeId,
     /// The kind of the import tree.
@@ -367,7 +368,8 @@ pub enum LiteralKind {
 /// span.
 #[derive(Debug, Clone, Node)]
 pub struct BinaryOp {
-    /// A unique identifier for the binary operator in the abstract syntax tree (AST).
+    /// A unique identifier for the binary operator in the abstract syntax tree
+    /// (AST).
     #[id]
     pub id: NodeId,
     /// The kind of binary operator (e.g., addition, subtraction, etc.).
@@ -427,7 +429,8 @@ pub enum BinaryOpKind {
 /// Represents a unary operator in the source code, including its kind and span.
 #[derive(Debug, Clone, Node)]
 pub struct UnaryOp {
-    /// A unique identifier for the unary operator in the abstract syntax tree (AST).
+    /// A unique identifier for the unary operator in the abstract syntax tree
+    /// (AST).
     #[id]
     pub id: NodeId,
     /// The kind of unary operator (e.g., negation, logical not, bitwise not).

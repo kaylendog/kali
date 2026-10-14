@@ -1,3 +1,5 @@
+//! Type inference errors and their origins.
+
 use kali_ast::Span;
 
 use crate::types::{Constraint, Type, TypeVar};
@@ -52,25 +54,31 @@ pub enum Origin {
         arm: Span,
     },
     /// The error relates a function definition and its argument.
-    Argument {
+    CallArgument {
         function: Span,
         argument: Span,
     },
-    Annotation {
+    LambdaAnnotation {
         annotation: Span,
         value: Span,
     },
     /// The error relates an operator and its operands.
-    Operation {
-        operator: Span,
+    BinaryExpr {
+        op: Span,
         lhs: Span,
         rhs: Span,
+    },
+    /// The error relates an operator and its operand.
+    UnaryExpr {
+        op: Span,
+        expr: Span,
     },
     /// The error relates a definition and its value.
     Definition {
         name: Span,
         value: Span,
     },
+    /// The error relates a name and its value.
     Name(Span),
     /// Empty origin for debugging purposes.
     Empty,
