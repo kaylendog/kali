@@ -321,8 +321,8 @@ pub enum ExprKind {
         condition: Box<Expr>,
         /// The expression to execute if the condition is true.
         body: Box<Expr>,
-        /// The expression to execute if the condition is false (optional).
-        otherwise: Option<Box<Expr>>,
+        /// The expression to execute if the condition is false.
+        otherwise: Box<Expr>,
     },
     /// A match expression.
     Match {
@@ -349,7 +349,7 @@ pub enum ExprKind {
     },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 /// Represents the kind of literal in the source code.
 pub enum LiteralKind {
     /// An integer literal (e.g., `-7`).
@@ -363,6 +363,9 @@ pub enum LiteralKind {
     /// A unit literal (empty tuple, `()`).
     Unit,
 }
+
+// Safety: the parser cannot produce non-finite floats.
+impl Eq for LiteralKind {}
 
 /// Represents a binary operator in the source code, including its kind and
 /// span.
@@ -473,7 +476,7 @@ pub struct MatchArm {
 }
 
 /// Represents the kind of pattern in a match arm.
-#[derive(Debug, Clone, Node)]
+#[derive(Debug, Clone, PartialEq, Eq, Node)]
 pub struct Pattern {
     /// A unique identifier for the pattern in the abstract syntax tree (AST).
     #[id]
@@ -486,7 +489,7 @@ pub struct Pattern {
 }
 
 /// The different kinds of patterns.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PatternKind {
     /// A literal pattern (e.g., `42`, `"foo"`, `true`).
     Literal(LiteralKind),

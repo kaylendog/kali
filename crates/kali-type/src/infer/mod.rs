@@ -11,6 +11,7 @@ use crate::{
 };
 
 mod expr;
+mod pattern;
 
 /// The inference engine state.
 #[derive(Debug, Default)]

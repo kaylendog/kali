@@ -366,11 +366,11 @@ where
             just(Token::KeywordIf)
                 .ignore_then(expr.clone())
                 .then(block.clone())
-                .then(just(Token::KeywordElse).ignore_then(block.or(else_if)).or_not())
+                .then(just(Token::KeywordElse).ignore_then(block.or(else_if)))
                 .map(|((condition, body), otherwise)| ExprKind::Conditional {
                     condition: Box::new(condition),
                     body: Box::new(body),
-                    otherwise: otherwise.map(Box::new),
+                    otherwise: Box::new(otherwise),
                 })
         })
         .labelled("if expression");

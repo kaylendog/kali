@@ -106,8 +106,42 @@ impl Infer {
             ExprKind::Record { fields } => Type::Record(
                 fields.iter().map(|(name, expr)| (name.key, self.expr(expr))).collect(),
             ),
-            ExprKind::Conditional { .. } => todo!(),
-            ExprKind::Match { .. } => todo!(),
+            ExprKind::Conditional { condition, body, otherwise } => {
+                let condition_ty = self.expr(condition);
+                self.scope.enter();
+                let body_ty = self.expr(body);
+                let otherwise_ty = self.expr(otherwise);
+                self.scope.exit();
+                self.unify(
+                    &body_ty,
+                    &otherwise_ty,
+                    Origin::Conditional {
+                        condition: condition.span,
+                        then: body.span,
+                        otherwise: otherwise.span,
+                    },
+                );
+                body_ty
+            }
+            ExprKind::Match { arms, value } => {
+                let value_ty = self.expr(value);
+                let result_ty = self.scope.fresh();
+
+                // For each arm, bind any pattern variables in the current scope.
+                for arm in arms {
+                    self.scope.enter();
+                    self.pattern(&arm.pattern, &value_ty);
+                    let arm_ty = self.expr(&arm.expr);
+                    self.unify(
+                        &result_ty,
+                        &arm_ty,
+                        Origin::MatchArms { first: arms[0].span, arm: arm.span },
+                    );
+                    self.scope.exit();
+                }
+
+                result_ty
+            }
             ExprKind::Lambda { params, body, .. } => {
                 // Enter a new scope for the lambda parameters and body.
                 self.scope.enter();

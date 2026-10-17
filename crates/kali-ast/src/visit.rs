@@ -468,9 +468,7 @@ impl Walker {
             ExprKind::Conditional { condition, body, otherwise } => {
                 self.walk_expr(visitor, condition)?;
                 self.walk_expr(visitor, body)?;
-                if let Some(otherwise_expr) = otherwise {
-                    self.walk_expr(visitor, otherwise_expr)?;
-                }
+                self.walk_expr(visitor, otherwise)?;
             }
             ExprKind::Match { value, arms } => {
                 self.walk_expr(visitor, value)?;

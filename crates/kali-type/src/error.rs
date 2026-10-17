@@ -1,6 +1,6 @@
 //! Type inference errors and their origins.
 
-use kali_ast::Span;
+use kali_ast::{Pattern, Span};
 
 use crate::types::{Constraint, Type, TypeVar};
 
@@ -33,10 +33,15 @@ pub enum ErrorKind {
     },
     /// An infinite type was encountered during type inference.
     InfiniteType,
-    /// A missing else clause was found during type inference.
-    MissingElse,
     /// Or-pattern bindings were found during type inference.
     OrPatternBindings,
+    /// A pattern type mismatch occurred during type inference.
+    PatternTypeMismatch {
+        /// The pattern that caused the mismatch.
+        pattern: Pattern,
+        /// The expected type for the pattern.
+        expected: Type,
+    },
 }
 
 /// An enumeration of the origins of type inference errors, providing slightly
@@ -45,6 +50,7 @@ pub enum ErrorKind {
 pub enum Origin {
     /// The error relates the two branches of a conditional.
     Conditional {
+        condition: Span,
         then: Span,
         otherwise: Span,
     },
@@ -80,6 +86,8 @@ pub enum Origin {
     },
     /// The error relates a name and its value.
     Name(Span),
+    /// An error that occurred in a pattern, providing the span of the pattern.
+    Pattern(Span),
     /// Empty origin for debugging purposes.
     Empty,
 }
