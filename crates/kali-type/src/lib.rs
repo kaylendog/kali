@@ -9,6 +9,7 @@ mod scope;
 mod types;
 mod unify;
 
+pub use error::{Error, ErrorKind};
 pub use infer::Infer;
 pub use scope::Scope;
 pub use types::{Scheme, Type};
@@ -23,10 +24,11 @@ pub fn check(module: &kali_ast::Module) -> Infer {
 
     for def in module.items.iter().filter_map(|item| item.kind.as_definition()) {
         infer.scope.enter();
-        let pattern = infer.destructor(&def.name);
+        let pattern_ty = infer.scope.fresh();
+        let pattern_ty = infer.pattern(&def.name, &pattern_ty);
         let body = infer.expr(&def.expr);
         infer.unify(
-            &pattern,
+            &pattern_ty,
             &body,
             Origin::Definition { name: def.name.span, value: def.expr.span },
         );

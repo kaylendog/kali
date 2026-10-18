@@ -1,4 +1,4 @@
-use crate::common::infer;
+use crate::common::{fails, infer};
 
 #[test]
 fn test_conditional_expr() {
@@ -10,6 +10,8 @@ fn test_conditional_expr() {
 fn test_match_monomorphic() {
     assert_eq!("int", infer("let x = match 1 { 1 -> 42 | _ -> 0 };"));
     assert_eq!("float", infer("let x = match 3.14 { 3.14 -> 2.71 | _ -> 0.0 };"));
+
+    fails("let x = t -> match t { (a, b) | { a } -> a } ");
 }
 
 #[test]

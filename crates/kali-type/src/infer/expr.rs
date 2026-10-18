@@ -106,10 +106,22 @@ impl Infer {
             ExprKind::Record { fields } => Type::Record(
                 fields.iter().map(|(name, expr)| (name.key, self.expr(expr))).collect(),
             ),
-            ExprKind::Conditional { condition, body, otherwise } => {
+            ExprKind::Conditional { condition, then, otherwise } => {
                 let condition_ty = self.expr(condition);
+
+                // Condition should be a boolean.
+                self.unify(
+                    &condition_ty,
+                    &Type::Bool,
+                    Origin::Conditional {
+                        condition: condition.span,
+                        then: then.span,
+                        otherwise: otherwise.span,
+                    },
+                );
+
                 self.scope.enter();
-                let body_ty = self.expr(body);
+                let body_ty = self.expr(then);
                 let otherwise_ty = self.expr(otherwise);
                 self.scope.exit();
                 self.unify(
@@ -117,7 +129,7 @@ impl Infer {
                     &otherwise_ty,
                     Origin::Conditional {
                         condition: condition.span,
-                        then: body.span,
+                        then: then.span,
                         otherwise: otherwise.span,
                     },
                 );
@@ -148,7 +160,9 @@ impl Infer {
                 let param_types: Vec<_> = params
                     .iter()
                     .map(|param| {
-                        let ty = self.destructor(&param.parameter);
+                        // Infer the type of the parameter's destructor.
+                        let param_ty = self.scope.fresh();
+                        let param_ty = self.pattern(&param.parameter, &param_ty);
                         // If the parameter has a type annotation, unify it with
                         // the inferred type.
                         if let Some(ty_expr) = &param.ty {
@@ -157,9 +171,9 @@ impl Infer {
                                 annotation: ty_expr.span,
                                 value: param.parameter.span,
                             };
-                            self.unify(&ty, &expected_ty, origin);
+                            self.unify(&param_ty, &expected_ty, origin);
                         }
-                        ty
+                        param_ty
                     })
                     .collect();
                 let ret_ty = self.expr(body);
@@ -202,59 +216,6 @@ impl Infer {
             }
         };
         self.cache.with(expr, ty)
-    }
-
-    /// Infers the type of a destructor pattern, binding any names in the
-    /// current scope.
-    pub(crate) fn destructor(&mut self, d: &kali_ast::Destructor) -> Type {
-        // Bind names in the destructor to current scope
-        use kali_ast::DestructorKind;
-        match &d.kind {
-            DestructorKind::Var(ident) => {
-                let ty = self.scope.fresh();
-                self.scope.bind_value(
-                    ident.key,
-                    Scheme { vars: Vec::new(), ty: ty.clone(), constraints: Vec::new() },
-                );
-                ty
-            }
-            DestructorKind::Tuple(destructors) => {
-                Type::Tuple(destructors.iter().map(|d| self.destructor(d)).collect())
-            }
-            DestructorKind::Record(index_map) => {
-                // For each field in the record:
-                // - If it is destructed, recursively infer the type of the
-                //   destructor (which may bind names in the current scope).
-                // - Otherwise, create a fresh type variable for the field and
-                //   bind it in the current scope.
-                let mut entry_types = IndexMap::new();
-                for (name, d) in index_map {
-                    if let Some(d) = d {
-                        // If the field is destructed, recursively infer its
-                        // type, which may bind names in the current scope.
-                        entry_types.insert(name.key, self.destructor(d));
-                    } else {
-                        // Otherwise, create a fresh type variable for the field
-                        // and bind it in the current scope.
-                        let ty = self.scope.fresh();
-                        self.scope.bind_value(
-                            name.key,
-                            Scheme { vars: Vec::new(), ty: ty.clone(), constraints: Vec::new() },
-                        );
-                        entry_types.insert(name.key, ty);
-                    }
-                }
-                Type::Record(entry_types)
-            }
-            DestructorKind::Cons { lhs, rhs } => {
-                let lhs_ty = self.destructor(lhs);
-                let rhs_ty = self.destructor(rhs);
-                let list_ty = Type::List(lhs_ty.into());
-                self.unify(&list_ty, &rhs_ty, Origin::Name(d.span));
-                list_ty
-            }
-            DestructorKind::Rest => Type::List(self.scope.fresh().into()),
-        }
     }
 }
 

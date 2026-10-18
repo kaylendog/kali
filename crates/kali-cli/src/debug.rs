@@ -68,7 +68,7 @@ fn print(path: PathBuf) -> Result<()> {
 /// Build an error report for the given error.
 fn build_report<'src>(
     filename: impl AsRef<str>,
-    errs: &[Rich<'src, Token<'src>>],
+    errs: &[Rich<'src, Token<'src>, kali_ast::Span>],
 ) -> Vec<Report<'src, (String, Range<usize>)>> {
     errs.iter()
         .map(|e| {

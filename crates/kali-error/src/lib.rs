@@ -1,9 +1,10 @@
 //! Error types for Kali
 
 use ariadne::Report;
+
 pub enum Error {
     /// A type error occurred.
-    TypeError(kali_type::TypeInferenceError),
+    Type(kali_type::Error),
 }
 
 impl Error {
