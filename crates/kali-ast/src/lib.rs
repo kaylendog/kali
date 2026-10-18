@@ -268,8 +268,8 @@ pub enum PrimitiveTypeKind {
 /// Represents a definition in the source code.
 #[derive(Debug, Clone)]
 pub struct Definition {
-    /// The name of the definition.
-    pub name: Destructor,
+    /// The pattern that defines the variable(s) being introduced.
+    pub name: Pattern,
     /// The expression associated with the definition.
     pub expr: Expr,
 }
@@ -320,7 +320,7 @@ pub enum ExprKind {
         /// The condition to evaluate.
         condition: Box<Expr>,
         /// The expression to execute if the condition is true.
-        body: Box<Expr>,
+        then: Box<Expr>,
         /// The expression to execute if the condition is false.
         otherwise: Box<Expr>,
     },
@@ -521,38 +521,8 @@ pub enum PatternKind {
 /// Argument to a lambda expression.
 #[derive(Debug, Clone)]
 pub struct LambdaParam {
-    /// A destructor that unpacks the argument.
-    pub parameter: Destructor,
+    /// A pattern that unpacks the argument.
+    pub parameter: Pattern,
     /// The optional type annotation for the argument.
     pub ty: Option<Type>,
-}
-
-/// Represents a destructor pattern, which is a pattern with only free
-/// variables.
-#[derive(Debug, Clone, Node)]
-pub struct Destructor {
-    /// A unique identifier for the destructor in the abstract syntax tree
-    /// (AST).
-    #[id]
-    pub id: NodeId,
-    /// The span of the destructor in the source code.
-    #[span]
-    pub span: Span,
-    /// THe kind of destructor.
-    pub kind: DestructorKind,
-}
-
-/// Represents the kind of a destructor pattern.
-#[derive(Debug, Clone)]
-pub enum DestructorKind {
-    /// A simple destructor with a single identifier.
-    Var(Ident),
-    /// A tuple destructor with multiple patterns.
-    Tuple(Vec<Destructor>),
-    /// A record destructor with named fields.
-    Record(indexmap::IndexMap<Ident, Option<Destructor>>),
-    /// A cons destructor (e.g., `a :: b`).
-    Cons { lhs: Box<Destructor>, rhs: Box<Destructor> },
-    /// A rest destructor.
-    Rest,
 }

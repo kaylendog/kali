@@ -9,10 +9,10 @@ use chumsky::{
     prelude::*,
 };
 use kali_ast::{
-    BinaryOp, BinaryOpKind, Comment, CommentKind, Definition, Destructor, DestructorKind, Expr,
-    ExprKind, Ident, ImportTree, ImportTreeKind, Item, ItemKind, LambdaParam, LiteralKind,
-    MatchArm, Module, NodeId, Pattern, PatternKind, PrimitiveTypeKind, Type, TypeAlias, TypeDecl,
-    TypeKind, UnaryOp, UnaryOpKind, Variant, Visibility,
+    BinaryOp, BinaryOpKind, Comment, CommentKind, Definition, Expr, ExprKind, Ident, ImportTree,
+    ImportTreeKind, Item, ItemKind, LambdaParam, LiteralKind, MatchArm, Module, NodeId, Pattern,
+    PatternKind, PrimitiveTypeKind, Type, TypeAlias, TypeDecl, TypeKind, UnaryOp, UnaryOpKind,
+    Variant, Visibility,
 };
 use logos::Logos;
 
@@ -167,9 +167,10 @@ where
     })
     .labelled("type");
 
-    // pattern ::= literal | variable | wildcard | tuple | record | empty_list |
-    // (pattern)
-    let pattern = recursive(|pattern| {
+    // pattern ::= pattern_atom (:: pattern)* (| pattern)*
+    let mut pattern = Recursive::declare();
+
+    let pattern_atom = {
         // literal ::= -? literal_kind
         // Patterns have no negation, so a leading `-` is folded into a numeric
         // literal.
@@ -223,10 +224,19 @@ where
             .map(PatternKind::Tuple)
             .labelled("tuple pattern");
 
-        // record ::= { ident : pattern (, ident : pattern)* }
-        let atom_record = ident
-            .then_ignore(just(Token::SymColon))
-            .then(pattern.clone())
+        // record_item ::= ident (: pattern)?
+        let atom_record_item = ident
+            .then(just(Token::SymColon).ignore_then(pattern.clone()).or_not())
+            .map_with(|(name, pattern), e| {
+                let pattern = pattern.unwrap_or_else(|| {
+                    let state: &mut SimpleState<State> = e.state();
+                    Pattern { id: state.next_id(), kind: PatternKind::Var(name), span: name.span }
+                });
+                (name, pattern)
+            });
+
+        // record ::= { record_item (, record_item)* }
+        let atom_record = atom_record_item
             .separated_by(just(Token::SymComma))
             .allow_trailing()
             .collect::<Vec<_>>()
@@ -239,7 +249,7 @@ where
             just(Token::SymArray).to(PatternKind::EmptyList).labelled("empty list pattern");
 
         // `atom_constructor` before `atom_variable`: both accept an identifier.
-        let atom = choice((
+        choice((
             atom_literal,
             atom_constructor,
             atom_variable,
@@ -252,76 +262,33 @@ where
             let state: &mut SimpleState<State> = e.state();
             Pattern { id: state.next_id(), kind, span: e.span() }
         })
-        .or(pattern.delimited_by(just(Token::SymLParen), just(Token::SymRParen)))
-        .labelled("pattern");
+        .or(pattern.clone().delimited_by(just(Token::SymLParen), just(Token::SymRParen)))
+        .labelled("pattern")
+    };
 
-        // pattern ::= pattern :: pattern | pattern | pattern
-        atom.pratt((
-            infix(Associativity::Right(2), just(Token::OpCons), |lhs, _, rhs, e| {
+    pattern.define(pattern_atom.clone().pratt((
+        infix(Associativity::Right(2), just(Token::OpCons), |lhs, _, rhs, e| {
+            let state: &mut SimpleState<State> = e.state();
+            Pattern {
+                id: state.next_id(),
+                kind: PatternKind::Cons { lhs: Box::new(lhs), rhs: Box::new(rhs) },
+                span: e.span(),
+            }
+        }),
+        infix(
+            // `|` is loosest, as in OCaml and Rust: `a :: b | c` is `(a :: b) | c`.
+            Associativity::Left(1),
+            just(Token::OpBitwiseOr),
+            |lhs, _, rhs, e| {
                 let state: &mut SimpleState<State> = e.state();
                 Pattern {
                     id: state.next_id(),
-                    kind: PatternKind::Cons { lhs: Box::new(lhs), rhs: Box::new(rhs) },
+                    kind: PatternKind::Or { lhs: Box::new(lhs), rhs: Box::new(rhs) },
                     span: e.span(),
                 }
-            }),
-            infix(
-                // `|` is loosest, as in OCaml and Rust: `a :: b | c` is `(a :: b) | c`.
-                Associativity::Left(1),
-                just(Token::OpBitwiseOr),
-                |lhs, _, rhs, e| {
-                    let state: &mut SimpleState<State> = e.state();
-                    Pattern {
-                        id: state.next_id(),
-                        kind: PatternKind::Or { lhs: Box::new(lhs), rhs: Box::new(rhs) },
-                        span: e.span(),
-                    }
-                },
-            ),
-        ))
-    })
-    .labelled("pattern");
-
-    // destructor ::= variable | tuple | record | (destructor)
-    let destructor = recursive(|destructor| {
-        // variable ::= ident
-        let atom_variable = ident.map(DestructorKind::Var).labelled("variable destructor");
-
-        // tuple ::= (destructor (, destructor)*)
-        let atom_tuple = destructor
-            .clone()
-            .separated_by(just(Token::SymComma))
-            .at_least(2)
-            .allow_trailing()
-            .collect::<Vec<_>>()
-            .delimited_by(just(Token::SymLParen), just(Token::SymRParen))
-            .map(DestructorKind::Tuple)
-            .labelled("tuple destructor");
-
-        // record_item := ident (: destructor)?
-        let atom_record_item = ident
-            .then(just(Token::SymColon).ignore_then(destructor.clone()).or_not())
-            .map(|(name, value)| (name, value))
-            .labelled("record item");
-
-        // record ::= { record_item (, record_item)* }
-        let atom_record = atom_record_item
-            .clone()
-            .separated_by(just(Token::SymComma))
-            .allow_trailing()
-            .collect::<Vec<_>>()
-            .delimited_by(just(Token::SymLBrace), just(Token::SymRBrace))
-            .map(|entries| DestructorKind::Record(indexmap::IndexMap::from_iter(entries)))
-            .labelled("record destructor");
-
-        choice((atom_variable, atom_tuple, atom_record))
-            .map_with(|kind, e| {
-                let state: &mut SimpleState<State> = e.state();
-                Destructor { id: state.next_id(), kind, span: e.span() }
-            })
-            .or(destructor.delimited_by(just(Token::SymLParen), just(Token::SymRParen)))
-    })
-    .labelled("destructor");
+            },
+        ),
+    )));
 
     // expr ::= literal | variable | tuple | list | if_expr | match_expr |
     // (expr)
@@ -369,7 +336,7 @@ where
                 .then(just(Token::KeywordElse).ignore_then(block.or(else_if)))
                 .map(|((condition, body), otherwise)| ExprKind::Conditional {
                     condition: Box::new(condition),
-                    body: Box::new(body),
+                    then: Box::new(body),
                     otherwise: Box::new(otherwise),
                 })
         })
@@ -407,19 +374,19 @@ where
         // expr ::= lambda | unary_expr | call | binary_expr
         atom.clone().pratt((
             // lambda ::= param+ -> expr
-            // param ::= destructor | (destructor : ty)
+            // param ::= pattern_atom | (pattern : ty)
             // OCaml style: params are juxtaposed, annotations need parens. Lowest binding power
             // so the body extends over every operator.
             prefix(
                 1,
                 choice((
-                    destructor
+                    pattern
                         .clone()
                         .then_ignore(just(Token::SymColon))
                         .then(ty.clone())
                         .delimited_by(just(Token::SymLParen), just(Token::SymRParen))
                         .map(|(parameter, ty)| LambdaParam { parameter, ty: Some(ty) }),
-                    destructor.clone().map(|parameter| LambdaParam { parameter, ty: None }),
+                    pattern_atom.clone().map(|parameter| LambdaParam { parameter, ty: None }),
                 ))
                 .repeated()
                 .at_least(1)
@@ -628,9 +595,9 @@ where
         .map(ItemKind::Import)
         .labelled("import tree");
 
-    // item_definition ::= let destructor = expr
+    // item_definition ::= let pattern = expr
     let item_definition = just(Token::KeywordLet)
-        .ignore_then(destructor.clone())
+        .ignore_then(pattern.clone())
         .then_ignore(just(Token::OpAssign))
         .then(expr.clone())
         .map(|(name, expr)| ItemKind::Definition(Definition { name, expr }))

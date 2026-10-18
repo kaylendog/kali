@@ -8,10 +8,9 @@
 use std::{borrow::Cow, collections::BTreeMap, io};
 
 use kali_ast::{
-    BinaryOpKind, Comment, CommentKind, Definition, Destructor, DestructorKind, Expr, ExprKind,
-    Ident, ImportTree, ImportTreeKind, Item, ItemKind, LambdaParam, LiteralKind, MatchArm, Module,
-    NodeId, Pattern, PatternKind, PrimitiveTypeKind, Type, TypeAlias, TypeDecl, TypeKind, Variant,
-    Visibility,
+    BinaryOpKind, Comment, CommentKind, Definition, Expr, ExprKind, Ident, ImportTree,
+    ImportTreeKind, Item, ItemKind, LambdaParam, LiteralKind, MatchArm, Module, NodeId, Pattern,
+    PatternKind, PrimitiveTypeKind, Type, TypeAlias, TypeDecl, TypeKind, Variant, Visibility,
 };
 use pretty::{RcDoc, Render, RenderAnnotated};
 
@@ -480,9 +479,15 @@ impl PrettyPrint for Pattern {
                 let fields = fields
                     .iter()
                     .map(|(name, pattern)| {
-                        name.pretty_print(ctx)
-                            .append(ctx.text(": "))
-                            .append(pattern.pretty_print(ctx))
+                        if let PatternKind::Var(binding) = &pattern.kind
+                            && binding.key == name.key
+                        {
+                            name.pretty_print(ctx)
+                        } else {
+                            name.pretty_print(ctx)
+                                .append(ctx.text(": "))
+                                .append(pattern.pretty_print(ctx))
+                        }
                     })
                     .collect();
                 ctx.delimited("{", "}", true, fields)
@@ -493,38 +498,6 @@ impl PrettyPrint for Pattern {
             PatternKind::Or { lhs, rhs } => operand(ctx, lhs, lhs_min)
                 .append(ctx.text(" | "))
                 .append(operand(ctx, rhs, rhs_min)),
-        }
-    }
-}
-
-impl PrettyPrint for Destructor {
-    fn pretty_print(&self, ctx: &mut Context) -> Doc {
-        match &self.kind {
-            DestructorKind::Var(name) => name.pretty_print(ctx),
-            DestructorKind::Rest => ctx.text("..."),
-            DestructorKind::Tuple(destructors) => {
-                let destructors = destructors.iter().map(|d| d.pretty_print(ctx)).collect();
-                ctx.delimited("(", ")", false, destructors)
-            }
-            DestructorKind::Record(fields) => {
-                let fields = fields
-                    .iter()
-                    .map(|(name, destructor)| {
-                        let name = name.pretty_print(ctx);
-                        // `{ x }` is shorthand for `{ x: x }`.
-                        match destructor {
-                            Some(destructor) => {
-                                name.append(ctx.text(": ")).append(destructor.pretty_print(ctx))
-                            }
-                            None => name,
-                        }
-                    })
-                    .collect();
-                ctx.delimited("{", "}", true, fields)
-            }
-            DestructorKind::Cons { lhs, rhs } => {
-                lhs.pretty_print(ctx).append(ctx.text(" :: ")).append(rhs.pretty_print(ctx))
-            }
         }
     }
 }
@@ -580,24 +553,22 @@ impl PrettyPrint for Expr {
                     .collect();
                 ctx.delimited("{", "}", true, fields)
             }
-            ExprKind::Conditional { condition, body, otherwise } => {
+            ExprKind::Conditional { condition, then: body, otherwise } => {
                 let body = body.pretty_print(ctx);
                 let mut doc = ctx
                     .text("if ")
                     .append(condition.pretty_print(ctx))
                     .append(RcDoc::space())
                     .append(ctx.block(body));
-                if let Some(otherwise) = otherwise {
-                    let otherwise_doc = otherwise.pretty_print(ctx);
-                    doc = doc.append(ctx.text(" else "));
-                    // `else { if .. }` prints as `else if ..`, so chains stay
-                    // flat.
-                    doc = if matches!(otherwise.kind, ExprKind::Conditional { .. }) {
-                        doc.append(otherwise_doc)
-                    } else {
-                        doc.append(ctx.block(otherwise_doc))
-                    };
-                }
+                let otherwise_doc = otherwise.pretty_print(ctx);
+                doc = doc.append(ctx.text(" else "));
+                // `else { if .. }` prints as `else if ..`, so chains stay
+                // flat.
+                doc = if matches!(otherwise.kind, ExprKind::Conditional { .. }) {
+                    doc.append(otherwise_doc)
+                } else {
+                    doc.append(ctx.block(otherwise_doc))
+                };
                 doc
             }
             ExprKind::Match { value, arms } => {

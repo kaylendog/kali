@@ -13,7 +13,6 @@ fn definitions() {
     rejects("let = 1");
     rejects("let x");
     rejects("let x = ");
-    rejects("let 1 = x");
 }
 
 #[test]

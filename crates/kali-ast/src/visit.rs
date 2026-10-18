@@ -1,6 +1,6 @@
 use crate::{
-    Definition, Destructor, Expr, ExprKind, Ident, ImportTree, ImportTreeKind, Item, ItemKind,
-    LambdaParam, MatchArm, Module, Pattern, Type, TypeAlias, TypeKind,
+    Definition, Expr, ExprKind, Ident, ImportTree, ImportTreeKind, Item, ItemKind, LambdaParam,
+    MatchArm, Module, Pattern, Type, TypeAlias, TypeKind,
 };
 
 /// A trait for visiting elements of the Kali Abstract Syntax Tree (AST).
@@ -152,19 +152,6 @@ pub trait Visitor {
     ///
     /// A `Result` indicating success or failure.
     fn visit_pattern(&mut self, _pattern: &Pattern) -> Result<(), Self::Error> {
-        Ok(())
-    }
-
-    /// Visits a destructor within the Kali AST.
-    ///
-    /// # Arguments
-    ///
-    /// * `destructor` - A reference to the `Destructor` to be visited.
-    ///
-    /// # Returns
-    ///
-    /// A `Result` indicating success or failure.
-    fn visit_destructor(&mut self, _destructor: &Destructor) -> Result<(), Self::Error> {
         Ok(())
     }
 
@@ -401,7 +388,7 @@ impl Walker {
         if let WalkOrder::PreOrder = self.order {
             visitor.visit_definition(definition)?;
         }
-        self.walk_destructor(visitor, &definition.name)?;
+        self.walk_pattern(visitor, &definition.name)?;
         self.walk_expr(visitor, &definition.expr)?;
         if let WalkOrder::PostOrder = self.order {
             visitor.visit_definition(definition)?;
@@ -465,7 +452,7 @@ impl Walker {
                     self.walk_expr(visitor, value)?;
                 }
             }
-            ExprKind::Conditional { condition, body, otherwise } => {
+            ExprKind::Conditional { condition, then: body, otherwise } => {
                 self.walk_expr(visitor, condition)?;
                 self.walk_expr(visitor, body)?;
                 self.walk_expr(visitor, otherwise)?;
@@ -543,30 +530,6 @@ impl Walker {
         Ok(())
     }
 
-    /// Walks a destructor within the Kali AST.
-    ///
-    /// # Arguments
-    ///
-    /// * `visitor` - A mutable reference to the `Visitor` implementation.
-    /// * `destructor` - A reference to the `Destructor` to be walked.
-    ///
-    /// # Returns
-    ///
-    /// A `Result` indicating success or failure.
-    pub fn walk_destructor<V: Visitor>(
-        &self,
-        visitor: &mut V,
-        destructor: &Destructor,
-    ) -> Result<(), V::Error> {
-        if let WalkOrder::PreOrder = self.order {
-            visitor.visit_destructor(destructor)?;
-        }
-        if let WalkOrder::PostOrder = self.order {
-            visitor.visit_destructor(destructor)?;
-        }
-        Ok(())
-    }
-
     /// Walks a lambda parameter within the Kali AST.
     ///
     /// # Arguments
@@ -585,7 +548,7 @@ impl Walker {
         if let WalkOrder::PreOrder = self.order {
             visitor.visit_lambda_param(lambda_param)?;
         }
-        self.walk_destructor(visitor, &lambda_param.parameter)?;
+        self.walk_pattern(visitor, &lambda_param.parameter)?;
         if let Some(param_type) = &lambda_param.ty {
             self.walk_type(visitor, param_type)?;
         }

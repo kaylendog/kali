@@ -34,8 +34,7 @@ fn records() {
     pattern("{ x: 0, }");
     pattern("{ }");
     pattern("{ p: (a, b) }");
-    // Shorthand `{ x }` is a destructor, not a pattern.
-    rejects_pattern("{ x }");
+    pattern("{ x }");
 }
 
 #[test]
@@ -85,7 +84,7 @@ fn rest_is_not_parsed() {
 }
 
 #[test]
-fn destructors() {
+fn let_bindings() {
     parses("let x = 1");
     parses("let (a, b) = p");
     parses("let (a, (b, c)) = p");
@@ -93,10 +92,9 @@ fn destructors() {
     parses("let { x: a, y: (b, c) } = p");
     parses("let { x, } = p");
     parses("let ((a)) = p");
-    // Destructors bind names only: no literals, wildcards or constructors.
-    rejects("let 1 = x");
-    rejects("let _ = x");
-    rejects("let [] = x");
-    rejects("let Some(a) = x");
-    rejects("let a :: b = x");
+    parses("let 1 = x");
+    parses("let _ = x");
+    parses("let [] = x");
+    parses("let Some(a) = x");
+    parses("let a :: b = x");
 }

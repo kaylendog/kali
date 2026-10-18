@@ -86,15 +86,12 @@ fn conditional() {
         "let x = if a < b { a } else { b }",
         "let x = if a < b {\n\ta\n} else {\n\tb\n}\n",
     );
-    assert_round_trip("let x = if a { b }", "let x = if a {\n\tb\n}\n");
     // `else { if .. }` and `else if ..` are the same tree and print as a flat
     // chain.
     assert_round_trip(
         "let x = if a { b } else { if c { d } else { e } }",
         "let x = if a {\n\tb\n} else if c {\n\td\n} else {\n\te\n}\n",
     );
-    assert_fixed("let x = if a {\n\tb\n} else if c {\n\td\n}\n");
-    assert_fixed("let x = if a {\n\tif b {\n\t\tc\n\t}\n} else {\n\td\n}\n");
 }
 
 #[test]

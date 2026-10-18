@@ -16,8 +16,8 @@ pub fn print_with(src: &str, settings: Settings) -> String {
 /// Printing `src` gives `expected`, and printing `expected` gives it back
 /// unchanged.
 pub fn assert_round_trip(src: &str, expected: &str) {
-    assert_eq!(print(src), expected, "first print of {src:?}");
-    assert_eq!(print(expected), expected, "reprint of {expected:?}");
+    assert_eq!(expected, print(src), "first print of {src:?}");
+    assert_eq!(expected, print(expected), "reprint of {expected:?}");
 }
 
 /// `src` is already in canonical form.
