@@ -12,7 +12,6 @@ impl Infer {
     /// Unify two types, returning the unified type. Failures are reported in
     /// `self.errors` and bubble up as `Type::Error`.
     pub(crate) fn unify(&mut self, lhs: &Type, rhs: &Type, origin: Origin) -> Type {
-        // Zonk both sides so bound variables never reach the match below.
         match (self.scope.zonk(lhs), self.scope.zonk(rhs)) {
             // Primitive types unify if they are exact.
             (lhs, rhs)
@@ -83,6 +82,25 @@ impl Infer {
             (Type::Var(var), actual) | (actual, Type::Var(var)) => {
                 self.bind_var(&var, actual, origin)
             }
+            // Constructors unify if their names match, they have the same arity, and their parameters unify.
+            (
+                Type::Constructor { name: lhs_name, args: lhs_args },
+                Type::Constructor { name: rhs_name, args: rhs_args },
+            ) => {
+                if lhs_name != rhs_name || lhs_args.len() != rhs_args.len() {
+                    let expected = Type::Constructor { name: lhs_name, args: lhs_args };
+                    let actual = Type::Constructor { name: rhs_name, args: rhs_args };
+                    return self.error(ErrorKind::Mismatch { expected, actual }, origin);
+                }
+                Type::Constructor {
+                    name: lhs_name,
+                    args: lhs_args
+                        .into_iter()
+                        .zip(rhs_args.into_iter())
+                        .map(|(lhs, rhs)| self.unify(&lhs, &rhs, origin.clone()))
+                        .collect(),
+                }
+            }
             // An error was already reported for one side.
             (Type::Error, _) | (_, Type::Error) => Type::Error,
             (expected, actual) => self.error(ErrorKind::Mismatch { expected, actual }, origin),
@@ -112,6 +130,7 @@ impl Infer {
 
 #[cfg(test)]
 mod tests {
+    use lasso::Key;
     use pretty_assertions::assert_eq;
 
     use crate::{
@@ -138,7 +157,7 @@ mod tests {
     }
 
     #[test]
-    fn unify_constructors() {
+    fn unify_composites() {
         let mut infer = Infer::default();
         let unknown = infer.scope.fresh();
         assert_eq!(
@@ -269,5 +288,28 @@ mod tests {
         assert_eq!(Type::Int, infer.unify(&unknown1, &Type::Int, Origin::Empty));
         assert_eq!(Type::Int, infer.unify(&unknown2, &unknown1, Origin::Empty));
         assert_eq!(Type::Int, infer.scope.zonk(&unknown2));
+    }
+
+    #[test]
+    fn unify_constructors() {
+        let mut infer = Infer::default();
+        let unknown = infer.scope.fresh();
+        assert_eq!(
+            Type::Constructor {
+                name: lasso::Spur::try_from_usize(0).unwrap(),
+                args: vec![Type::Bool]
+            },
+            infer.unify(
+                &Type::Constructor {
+                    name: lasso::Spur::try_from_usize(0).unwrap(),
+                    args: vec![unknown]
+                },
+                &Type::Constructor {
+                    name: lasso::Spur::try_from_usize(0).unwrap(),
+                    args: vec![Type::Bool]
+                },
+                Origin::Empty
+            )
+        );
     }
 }

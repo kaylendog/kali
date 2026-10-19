@@ -100,6 +100,13 @@ pub enum Type {
     Fn(Box<Type>, Box<Type>),
     /// A type variable, representing a type that is not yet known.
     Var(TypeVar),
+    /// A constructed data type.
+    Constructor {
+        /// The name of the type constructor.
+        name: lasso::Spur,
+        /// The type arguments for the constructor.
+        args: Vec<Type>,
+    },
     /// An error type, representing a type that could not be inferred or is
     /// invalid.
     Error,
@@ -150,6 +157,10 @@ impl Type {
             Type::Record(fields) => {
                 Type::Record(fields.iter().map(|(name, ty)| (*name, ty.map_vars(f))).collect())
             }
+            Type::Constructor { name, args } => Type::Constructor {
+                name: *name,
+                args: args.iter().map(|arg| arg.map_vars(f)).collect(),
+            },
             Type::Fn(param, ret) => Type::Fn(param.map_vars(f).into(), ret.map_vars(f).into()),
             Type::Int | Type::Float | Type::Bool | Type::String | Type::Unit | Type::Error => {
                 self.clone()
@@ -177,6 +188,7 @@ impl<'a> Iterator for WalkVars<'a> {
                     self.stack.push(ret);
                     self.stack.push(param);
                 }
+                Type::Constructor { args, .. } => self.stack.extend(args.iter().rev()),
                 Type::Int | Type::Float | Type::Bool | Type::String | Type::Unit | Type::Error => {}
             }
         }
@@ -280,6 +292,20 @@ pub(crate) fn write_type(
             write_type(f, ret, rodeo, names)
         }
         Type::Var(var) => names.write(f, var),
+        Type::Constructor { name, args } => {
+            write!(f, "{}", rodeo.resolve(name))?;
+            if !args.is_empty() {
+                write!(f, "<")?;
+                for (i, arg) in args.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write_type(f, arg, rodeo, names)?;
+                }
+                write!(f, ">")?;
+            }
+            Ok(())
+        }
         Type::Error => write!(f, "<error>"),
     }
 }
