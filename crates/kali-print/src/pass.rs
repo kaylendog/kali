@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, convert::Infallible, ops::Range};
 
-use kali_ast::{Comment, NodeId, Span};
+use kali_ast::{Comment, NodeId};
 
 /// Comments attached to one AST node.
 #[derive(Debug, Clone, Default)]
@@ -17,7 +17,7 @@ pub(crate) struct Comments {
 /// order.
 pub(crate) struct CommentsPass<'a> {
     /// Every comment in the module, keyed by span.
-    raw: &'a BTreeMap<Span, Comment>,
+    raw: &'a BTreeMap<kali_span::Span, Comment>,
     /// Original source, used to tell `let a = 1 // note` from a comment on its
     /// own line.
     src: &'a str,
@@ -31,7 +31,7 @@ pub(crate) struct CommentsPass<'a> {
 }
 
 impl<'a> CommentsPass<'a> {
-    pub(crate) fn new(raw: &'a BTreeMap<Span, Comment>, src: &'a str) -> Self {
+    pub(crate) fn new(raw: &'a BTreeMap<kali_span::Span, Comment>, src: &'a str) -> Self {
         Self { raw, src, resolved: BTreeMap::new(), cursor: 0, previous: None }
     }
 
@@ -42,8 +42,8 @@ impl<'a> CommentsPass<'a> {
 
     /// Returns the comments starting within `range`, in source order.
     fn claim(&self, range: Range<usize>) -> Vec<Comment> {
-        let lower: Span = (range.start..range.start).into();
-        let upper: Span = (range.end..range.end).into();
+        let lower: kali_span::Span = (range.start..range.start).into();
+        let upper: kali_span::Span = (range.end..range.end).into();
         self.raw.range(lower..upper).map(|(_, comment)| comment.clone()).collect()
     }
 
@@ -91,7 +91,8 @@ mod tests {
     #[test]
     fn comments_attach_to_one_item_each() {
         let src = "// leading one\nlet one = 1; // after one\nlet two = 2\n// trailing two";
-        let (module, errors) = kali_parse::parse_str(src);
+        let (module, errors) =
+            kali_parse::parse_str(src, kali_span::Context { src: kali_span::SourceId(0) });
         assert!(errors.is_empty(), "{errors:?}");
         let module = module.unwrap();
 

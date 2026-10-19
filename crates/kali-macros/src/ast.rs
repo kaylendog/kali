@@ -10,13 +10,14 @@ pub(crate) fn expand_node(input: syn::DeriveInput) -> syn::Result<TokenStream> {
     let id = find_field_with_attr(&input, "id")?.ident.as_ref().unwrap();
     let span = find_field_with_attr(&input, "span")?.ident.as_ref().unwrap();
     let kali_ast = crate_of("kali-ast")?;
+    let kali_span = crate_of("kali-span")?;
     Ok(quote! {
         impl #kali_ast::Node for #name {
             fn id(&self) -> #kali_ast::NodeId {
                 self.#id
             }
 
-            fn span(&self) -> &#kali_ast::Span {
+            fn span(&self) -> &#kali_span::Span {
                 &self.#span
             }
         }

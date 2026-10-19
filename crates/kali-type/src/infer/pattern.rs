@@ -3,7 +3,8 @@ use indexmap::IndexMap;
 use crate::{error::Origin, Infer, Type};
 
 impl Infer {
-    /// A helper function to make a best-effort attempt to infer the type of a pattern.
+    /// A helper function to make a best-effort attempt to infer the type of a
+    /// pattern.
     pub(crate) fn pattern(&mut self, pat: &kali_ast::Pattern, input_ty: &Type) -> Type {
         use kali_ast::PatternKind;
         let pat_ty = match &pat.kind {
@@ -48,15 +49,18 @@ impl Infer {
                 let pat_rhs_ty = self.scope.fresh();
                 let pat_lhs_ty = self.pattern(lhs, &pat_lhs_ty);
                 let pat_rhs_ty = self.pattern(rhs, &pat_rhs_ty);
-
                 self.unify(&pat_lhs_ty, &pat_rhs_ty, Origin::Pattern(pat.span));
-
                 pat_lhs_ty
             }
             PatternKind::Constructor { name: _, payload } => {
                 todo!()
             }
-            PatternKind::Rest => input_ty.clone(),
+            PatternKind::Rest => {
+                // The input could either be a record or a list - we don't know
+                // which, so we just it unmodified.
+                // TODO: We could constrain here?
+                input_ty.clone()
+            }
         };
 
         self.unify(&pat_ty, &input_ty, Origin::Pattern(pat.span))

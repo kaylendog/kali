@@ -4,10 +4,10 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+chumsky.workspace = true
 indexmap.workspace = true
 lasso.workspace = true
 strum.workspace = true
 
-chumsky = "0.12.0"
-
+kali-span.path = "../kali-span"
 kali-macros.path = "../kali-macros"

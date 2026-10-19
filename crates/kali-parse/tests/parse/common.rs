@@ -3,14 +3,16 @@ pub use pretty_assertions::assert_eq;
 
 /// Parses `src`, panicking on any error.
 pub fn parses(src: &str) -> Module {
-    let (module, errors) = kali_parse::parse_str(src);
+    let (module, errors) =
+        kali_parse::parse_str(src, kali_span::Context { src: kali_span::SourceId(0) });
     assert!(errors.is_empty(), "{src:?} failed to parse: {errors:?}");
     module.expect("no errors but no module")
 }
 
 /// Asserts that `src` does not parse.
 pub fn rejects(src: &str) {
-    let (_, errors) = kali_parse::parse_str(src);
+    let (_, errors) =
+        kali_parse::parse_str(src, kali_span::Context { src: kali_span::SourceId(0) });
     assert!(!errors.is_empty(), "{src:?} parsed but should not");
 }
 

@@ -11,6 +11,7 @@ pretty = "0.12.5"
 
 kali-ast.path = "../kali-ast"
 kali-parse.path = "../kali-parse"
+kali-span.path = "../kali-span"
 
 [dev-dependencies]
 pretty_assertions.workspace = true

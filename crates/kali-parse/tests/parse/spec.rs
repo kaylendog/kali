@@ -30,7 +30,8 @@ fn examples_parse() {
     let failures = blocks
         .iter()
         .filter_map(|(line, src)| {
-            let (_, errors) = kali_parse::parse_str(src);
+            let (_, errors) =
+                kali_parse::parse_str(src, kali_span::Context { src: kali_span::SourceId(0) });
             (!errors.is_empty()).then(|| format!("block at line {line}: {errors:?}\n{src}"))
         })
         .collect::<Vec<_>>();
@@ -42,7 +43,11 @@ fn planned_examples_do_not_parse_yet() {
     // When one of these starts parsing, retag it `kali` in the spec.
     let stale = blocks("kali-planned")
         .into_iter()
-        .filter(|(_, src)| kali_parse::parse_str(src).1.is_empty())
+        .filter(|(_, src)| {
+            kali_parse::parse_str(src, kali_span::Context { src: kali_span::SourceId(0) })
+                .1
+                .is_empty()
+        })
         .map(|(line, src)| format!("block at line {line} now parses:\n{src}"))
         .collect::<Vec<_>>();
     assert!(stale.is_empty(), "\n{}", stale.join("\n\n"));

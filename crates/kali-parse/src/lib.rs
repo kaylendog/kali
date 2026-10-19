@@ -16,7 +16,7 @@ use kali_ast::{
 };
 use logos::Logos;
 
-pub use crate::lexer::Token;
+pub use crate::lexer::{Token, TokenKind};
 
 mod lexer;
 
@@ -42,15 +42,18 @@ impl State {
     }
 }
 
+/// An alias for the parser error type, using `chumsky`'s `Rich` error type.
+pub type Error<'src> = chumsky::error::Rich<'src, Token<'src>, kali_span::Span>;
+
 /// Concrete type for the parser extras.
-type Extras<'src> = extra::Full<Rich<'src, Token<'src>, kali_ast::Span>, SimpleState<State>, ()>;
+type Extras<'src> = extra::Full<Error<'src>, SimpleState<State>, kali_span::Context>;
 
 /// Shorthand function to construct a [`BinaryOp`].
 fn binary_op<'src, I>(
     op: impl Parser<'src, I, BinaryOpKind, Extras<'src>> + 'src,
 ) -> impl Parser<'src, I, BinaryOp, Extras<'src>> + Clone
 where
-    I: ValueInput<'src, Token = Token<'src>, Span = kali_ast::Span>,
+    I: ValueInput<'src, Token = Token<'src>, Span = kali_span::Span>,
 {
     op.map_with(|kind, e| BinaryOp { id: e.state().next_id(), kind, span: e.span() }).boxed()
 }
@@ -63,7 +66,7 @@ fn binary_expr<'src, I>(
     e: &mut MapExtra<'src, '_, I, Extras<'src>>,
 ) -> Expr
 where
-    I: ValueInput<'src, Token = Token<'src>, Span = kali_ast::Span>,
+    I: ValueInput<'src, Token = Token<'src>, Span = kali_span::Span>,
 {
     Expr {
         id: e.state().next_id(),
@@ -74,7 +77,7 @@ where
 
 pub(crate) fn parser<'src, I>() -> impl Parser<'src, I, Vec<Item>, Extras<'src>>
 where
-    I: ValueInput<'src, Token = Token<'src>, Span = kali_ast::Span>,
+    I: ValueInput<'src, Token = Token<'src>, Span = kali_span::Span>,
 {
     // ident ::= Ident
     let ident = select! { Token::Ident(ident) => ident }
@@ -264,6 +267,7 @@ where
         })
         .or(pattern.clone().delimited_by(just(Token::SymLParen), just(Token::SymRParen)))
         .labelled("pattern")
+        .boxed()
     };
 
     pattern.define(pattern_atom.clone().pratt((
@@ -369,145 +373,150 @@ where
                     let state: &mut SimpleState<State> = e.state();
                     Expr { id: state.next_id(), kind, span: e.span() }
                 })
-                .or(expr.clone().delimited_by(just(Token::SymLParen), just(Token::SymRParen)));
+                .or(expr.clone().delimited_by(just(Token::SymLParen), just(Token::SymRParen)))
+                .boxed();
 
         // expr ::= lambda | unary_expr | call | binary_expr
-        atom.clone().pratt((
-            // lambda ::= param+ -> expr
-            // param ::= pattern_atom | (pattern : ty)
-            // OCaml style: params are juxtaposed, annotations need parens. Lowest binding power
-            // so the body extends over every operator.
-            prefix(
-                1,
-                choice((
-                    pattern
-                        .clone()
-                        .then_ignore(just(Token::SymColon))
-                        .then(ty.clone())
-                        .delimited_by(just(Token::SymLParen), just(Token::SymRParen))
-                        .map(|(parameter, ty)| LambdaParam { parameter, ty: Some(ty) }),
-                    pattern_atom.clone().map(|parameter| LambdaParam { parameter, ty: None }),
-                ))
-                .repeated()
-                .at_least(1)
-                .collect::<Vec<_>>()
-                .then_ignore(just(Token::SymArrow)),
-                |params, body, e| {
-                    let state: &mut SimpleState<State> = e.state();
-                    Expr {
-                        id: state.next_id(),
-                        kind: ExprKind::Lambda { params, ret_ty: None, body: Box::new(body) },
-                        span: e.span(),
-                    }
-                },
-            ),
-            // unary_expr ::= op expr
-            // Below call, so `-f x` is `-(f x)`: application binds tighter than every operator.
-            prefix(
-                10,
-                select! {
-                     Token::OpAdd => UnaryOpKind::UnaryPlus,
-                     Token::OpBitwiseNot => UnaryOpKind::BitwiseNot,
-                     Token::OpNegate => UnaryOpKind::LogicalNot,
-                     Token::OpSubtract => UnaryOpKind::Negate,
-                }
-                .map_with(|kind, e| {
-                    let state: &mut SimpleState<State> = e.state();
-                    UnaryOp { id: state.next_id(), kind, span: e.span() }
-                }),
-                |op, expr, e| {
-                    let state: &mut SimpleState<State> = e.state();
-                    Expr {
-                        id: state.next_id(),
-                        kind: ExprKind::UnaryExpr { expr: Box::new(expr), op },
-                        span: e.span(),
-                    }
-                },
-            ),
-            // call ::= expr (expr (, expr)*)
-            postfix(
-                11,
-                just(Token::LitUnit).to(vec![]).or(atom
-                    .clone()
-                    .separated_by(just(Token::SymComma))
+        atom.clone()
+            .pratt((
+                // lambda ::= param+ -> expr
+                // param ::= pattern_atom | (pattern : ty)
+                // OCaml style: params are juxtaposed, annotations need parens. Lowest binding
+                // power so the body extends over every operator.
+                prefix(
+                    1,
+                    choice((
+                        pattern
+                            .clone()
+                            .then_ignore(just(Token::SymColon))
+                            .then(ty.clone())
+                            .delimited_by(just(Token::SymLParen), just(Token::SymRParen))
+                            .map(|(parameter, ty)| LambdaParam { parameter, ty: Some(ty) }),
+                        pattern_atom.clone().map(|parameter| LambdaParam { parameter, ty: None }),
+                    ))
+                    .repeated()
                     .at_least(1)
-                    .collect::<Vec<_>>()),
-                |function, arguments, e| {
-                    let state: &mut SimpleState<State> = e.state();
-                    Expr {
-                        id: state.next_id(),
-                        kind: ExprKind::Call { function: Box::new(function), arguments },
-                        span: e.span(),
+                    .collect::<Vec<_>>()
+                    .then_ignore(just(Token::SymArrow))
+                    .boxed(),
+                    |params, body, e| {
+                        let state: &mut SimpleState<State> = e.state();
+                        Expr {
+                            id: state.next_id(),
+                            kind: ExprKind::Lambda { params, ret_ty: None, body: Box::new(body) },
+                            span: e.span(),
+                        }
+                    },
+                ),
+                // unary_expr ::= op expr
+                // Below call, so `-f x` is `-(f x)`: application binds tighter than every
+                // operator.
+                prefix(
+                    10,
+                    select! {
+                         Token::OpAdd => UnaryOpKind::UnaryPlus,
+                         Token::OpBitwiseNot => UnaryOpKind::BitwiseNot,
+                         Token::OpNegate => UnaryOpKind::LogicalNot,
+                         Token::OpSubtract => UnaryOpKind::Negate,
                     }
-                },
-            ),
-            // binary_expr ::= expr op expr
-            infix(
-                right(9),
-                binary_op(select! {
-                    Token::OpExponentiate => BinaryOpKind::Exponentiate
-                }),
-                binary_expr,
-            ),
-            infix(
-                left(8),
-                binary_op(select! {
-                    Token::OpMultiply => BinaryOpKind::Multiply,
-                    Token::OpDivide => BinaryOpKind::Divide,
-                    Token::OpModulo => BinaryOpKind::Modulo,
-                }),
-                binary_expr,
-            ),
-            infix(
-                left(7),
-                binary_op(select! {
-                    Token::OpAdd => BinaryOpKind::Add,
-                    Token::OpSubtract => BinaryOpKind::Subtract,
-                }),
-                binary_expr,
-            ),
-            // Between arithmetic and comparison, as in OCaml and Haskell, so `x :: rest == l`
-            // compares the list.
-            infix(
-                right(6),
-                binary_op(select! {
-                    Token::OpCons => BinaryOpKind::Cons,
-                }),
-                binary_expr,
-            ),
-            infix(
-                left(5),
-                binary_op(select! {
-                    Token::OpLessThanOrEqual => BinaryOpKind::LessThanOrEqual,
-                    Token::OpGreaterThanOrEqual => BinaryOpKind::GreaterThanOrEqual,
-                    Token::OpLessThan => BinaryOpKind::LessThan,
-                    Token::OpGreaterThan => BinaryOpKind::GreaterThan,
-                }),
-                binary_expr,
-            ),
-            infix(
-                left(4),
-                binary_op(select! {
-                    Token::OpEqual => BinaryOpKind::Equal,
-                    Token::OpNotEqual => BinaryOpKind::NotEqual,
-                }),
-                binary_expr,
-            ),
-            infix(
-                left(3),
-                binary_op(select! {
-                    Token::OpLogicalAnd => BinaryOpKind::LogicalAnd,
-                }),
-                binary_expr,
-            ),
-            infix(
-                left(2),
-                binary_op(select! {
-                    Token::OpLogicalOr => BinaryOpKind::LogicalOr,
-                }),
-                binary_expr,
-            ),
-        ))
+                    .map_with(|kind, e| {
+                        let state: &mut SimpleState<State> = e.state();
+                        UnaryOp { id: state.next_id(), kind, span: e.span() }
+                    }),
+                    |op, expr, e| {
+                        let state: &mut SimpleState<State> = e.state();
+                        Expr {
+                            id: state.next_id(),
+                            kind: ExprKind::UnaryExpr { expr: Box::new(expr), op },
+                            span: e.span(),
+                        }
+                    },
+                ),
+                // call ::= expr (expr (, expr)*)
+                postfix(
+                    11,
+                    just(Token::LitUnit).to(vec![]).or(atom
+                        .clone()
+                        .separated_by(just(Token::SymComma))
+                        .at_least(1)
+                        .collect::<Vec<_>>()),
+                    |function, arguments, e| {
+                        let state: &mut SimpleState<State> = e.state();
+                        Expr {
+                            id: state.next_id(),
+                            kind: ExprKind::Call { function: Box::new(function), arguments },
+                            span: e.span(),
+                        }
+                    },
+                ),
+                // binary_expr ::= expr op expr
+                infix(
+                    right(9),
+                    binary_op(select! {
+                        Token::OpExponentiate => BinaryOpKind::Exponentiate
+                    }),
+                    binary_expr,
+                ),
+                infix(
+                    left(8),
+                    binary_op(select! {
+                        Token::OpMultiply => BinaryOpKind::Multiply,
+                        Token::OpDivide => BinaryOpKind::Divide,
+                        Token::OpModulo => BinaryOpKind::Modulo,
+                    }),
+                    binary_expr,
+                ),
+                infix(
+                    left(7),
+                    binary_op(select! {
+                        Token::OpAdd => BinaryOpKind::Add,
+                        Token::OpSubtract => BinaryOpKind::Subtract,
+                    }),
+                    binary_expr,
+                ),
+                // Between arithmetic and comparison, as in OCaml and Haskell, so `x :: rest == l`
+                // compares the list.
+                infix(
+                    right(6),
+                    binary_op(select! {
+                        Token::OpCons => BinaryOpKind::Cons,
+                    }),
+                    binary_expr,
+                ),
+                infix(
+                    left(5),
+                    binary_op(select! {
+                        Token::OpLessThanOrEqual => BinaryOpKind::LessThanOrEqual,
+                        Token::OpGreaterThanOrEqual => BinaryOpKind::GreaterThanOrEqual,
+                        Token::OpLessThan => BinaryOpKind::LessThan,
+                        Token::OpGreaterThan => BinaryOpKind::GreaterThan,
+                    }),
+                    binary_expr,
+                ),
+                infix(
+                    left(4),
+                    binary_op(select! {
+                        Token::OpEqual => BinaryOpKind::Equal,
+                        Token::OpNotEqual => BinaryOpKind::NotEqual,
+                    }),
+                    binary_expr,
+                ),
+                infix(
+                    left(3),
+                    binary_op(select! {
+                        Token::OpLogicalAnd => BinaryOpKind::LogicalAnd,
+                    }),
+                    binary_expr,
+                ),
+                infix(
+                    left(2),
+                    binary_op(select! {
+                        Token::OpLogicalOr => BinaryOpKind::LogicalOr,
+                    }),
+                    binary_expr,
+                ),
+            ))
+            .boxed()
     })
     .labelled("expression");
 
@@ -676,16 +685,17 @@ pub fn lex_str<'src>(src: &'src str) -> Vec<Spanned<Token<'src>>> {
 ///
 /// ```
 /// let source = "let x = 42;";
-/// let (module, errors) = kali_parse::parse_str(source);
+/// let (module, errors) = kali_parse::parse_str(source, Default::default());
 /// println!("Parsed module: {:?}", module);
 /// println!("Parsing errors: {:?}", errors);
 /// ```
 pub fn parse_str<'src>(
     src: &'src str,
-) -> (Option<Module>, Vec<Rich<'src, Token<'src>, kali_ast::Span>>) {
+    context: kali_span::Context,
+) -> (Option<Module>, Vec<Rich<'src, Token<'src>, kali_span::Span>>) {
     let mut state: SimpleState<State> = State::default().into();
 
-    let tokens: Vec<(Token, kali_ast::Span)> = Token::lexer(src)
+    let tokens: Vec<(Token, kali_span::Span)> = Token::lexer(src)
         .spanned()
         .map(|(tok, span)| match tok {
             Ok(tok) => (tok, span.into()),
@@ -721,7 +731,7 @@ pub fn parse_str<'src>(
             .iter()
             .map(|(tok, _)| tok)
             .find(|tok| !matches!(tok, Token::Newline | Token::Comment(_) | Token::DocComment(_)))
-            .is_some_and(|tok| {
+            .is_some_and(|tok: &Token<'_>| {
                 // `|` starts a match arm, so a line end before it continues the
                 // match.
                 matches!(
@@ -734,12 +744,27 @@ pub fn parse_str<'src>(
         }
     }
 
-    let token_stream =
-        Stream::from_iter(significant).map((0..src.len()).into(), |(t, s): (_, _)| (t, s));
+    let token_stream = Stream::from_iter(significant)
+        .map(kali_span::Span::from(0..src.len()).with_context(context), |(t, s): (_, _)| (t, s));
 
     let (items, errors) = parser().parse_with_state(token_stream, &mut state).into_output_errors();
 
     (items.map(move |items| Module { cache: state.0.rodeo, items, comments }), errors)
+}
+
+/// Like `parse_str`, but constructs a default `kali_span::Context` for you.
+/// This is useful for quick parsing in tests or examples where you don't need
+/// to customize the context.
+#[cfg(feature = "test")]
+pub fn debug_parse_str(src: &str) -> (Option<Module>, Vec<Error<'_>>) {
+    let (module, errors) = parse_str(src, kali_span::Context::default());
+    if !errors.is_empty() {
+        eprintln!("Parsing failed with errors:");
+        for error in &errors {
+            eprintln!("{:?}", error);
+        }
+    }
+    (module, errors)
 }
 
 /// The `kali!` macro is a utility for parsing Rust-like syntax into a `Module`
@@ -778,7 +803,7 @@ pub fn parse_str<'src>(
 macro_rules! kali {
     ($($tts:tt)*) => {{
         let input = stringify!($($tts)*);
-        $crate::parse_str(input)
+        $crate::parse_str(input, kali_span::Context::default())
     }};
 }
 
@@ -789,7 +814,7 @@ macro_rules! kali {
 macro_rules! kali_unwrap {
     ($($tts:tt)*) => {{
         let input = stringify!($($tts)*);
-        let (module, errors) = $crate::parse_str(input);
+        let (module, errors) = $crate::parse_str(input, kali_span::Context::default());
         if !errors.is_empty() {
             panic!("Parsing failed with errors: {:?}", errors);
         }

@@ -1,0 +1,14 @@
+[package]
+name = "kali-main"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ariadne.workspace = true
+
+kali-ast.path = "../kali-ast"
+kali-error.path = "../kali-error"
+kali-parse.path = "../kali-parse"
+kali-print.path = "../kali-print"
+kali-span.path = "../kali-span"
+kali-type.path = "../kali-type"

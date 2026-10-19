@@ -2,11 +2,9 @@ use std::{collections::BTreeMap, hash::Hash};
 
 use kali_macros::Node;
 
-mod span;
 mod traits;
 mod visit;
 
-pub use span::Span;
 pub use traits::Node;
 pub use visit::{Visitor, WalkOrder, Walker};
 
@@ -21,7 +19,7 @@ pub struct Module {
     /// within the module.
     pub cache: lasso::Rodeo,
     /// A collection of comments found in the source code, keyed by their span.
-    pub comments: BTreeMap<Span, Comment>,
+    pub comments: BTreeMap<kali_span::Span, Comment>,
 }
 
 /// The type used to uniquely identify nodes in the abstract syntax tree (AST).
@@ -41,7 +39,7 @@ pub struct Ident {
     pub key: lasso::Spur,
     /// The span of the identifier in the source code.
     #[span]
-    pub span: Span,
+    pub span: kali_span::Span,
 }
 
 impl PartialEq for Ident {
@@ -66,7 +64,7 @@ pub struct Comment {
     /// The kind of comment.
     pub kind: CommentKind,
     /// The span of the comment in the source code.
-    pub span: Span,
+    pub span: kali_span::Span,
 }
 
 /// An enumeration of the three kinds of comment.
@@ -87,7 +85,7 @@ pub struct Item {
     pub id: NodeId,
     /// The span of the item in the source code.
     #[span]
-    pub span: Span,
+    pub span: kali_span::Span,
     /// The kind of the item (e.g., function, struct, etc.).
     pub kind: ItemKind,
     /// The visibility of the item (e.g., private, exported, or inherited).
@@ -156,7 +154,7 @@ pub struct ImportTree {
     pub kind: ImportTreeKind,
     /// The span of the import tree in the source code.
     #[span]
-    pub span: Span,
+    pub span: kali_span::Span,
 }
 
 /// A tree of imports.
@@ -217,7 +215,7 @@ pub struct Variant {
     pub payload: Option<Type>,
     /// The span of the variant in the source code.
     #[span]
-    pub span: Span,
+    pub span: kali_span::Span,
 }
 
 /// Represents a type in the source code, including its span and kind.
@@ -228,7 +226,7 @@ pub struct Type {
     pub id: NodeId,
     /// The span of the type in the source code.
     #[span]
-    pub span: Span,
+    pub span: kali_span::Span,
     /// The kind of type (primitive, function, tuple, etc.).
     pub kind: TypeKind,
 }
@@ -283,7 +281,7 @@ pub struct Expr {
     pub id: NodeId,
     #[span]
     /// The span of the expression in the source code.
-    pub span: Span,
+    pub span: kali_span::Span,
     /// The kind of expression.
     pub kind: ExprKind,
 }
@@ -379,7 +377,7 @@ pub struct BinaryOp {
     pub kind: BinaryOpKind,
     /// The span of the binary operator in the source code.
     #[span]
-    pub span: Span,
+    pub span: kali_span::Span,
 }
 
 /// Represents the kind of binary operator in the source code.
@@ -440,7 +438,7 @@ pub struct UnaryOp {
     pub kind: UnaryOpKind,
     /// The span of the unary operator in the source code.
     #[span]
-    pub span: Span,
+    pub span: kali_span::Span,
 }
 
 /// An enumeration of unary operators.
@@ -468,7 +466,7 @@ pub struct MatchArm {
     pub id: NodeId,
     /// The span of the match arm in the source code.
     #[span]
-    pub span: Span,
+    pub span: kali_span::Span,
     /// The pattern to match.
     pub pattern: Pattern,
     /// The expression to execute if the pattern matches.
@@ -483,7 +481,7 @@ pub struct Pattern {
     pub id: NodeId,
     /// The span of the pattern in the source code.
     #[span]
-    pub span: Span,
+    pub span: kali_span::Span,
     /// The kind of pattern (literal, identifier, tuple, etc.).
     pub kind: PatternKind,
 }

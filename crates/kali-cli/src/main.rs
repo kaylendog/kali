@@ -38,12 +38,7 @@ fn main() {
 
     let Args { command, opts } = Args::parse();
 
-    let result = match command {
+    match command {
         Command::Debug(command) => debug(command, &opts),
     };
-
-    if let Err(err) = result {
-        eprintln!("Error: {}", err);
-        std::process::exit(1);
-    }
 }

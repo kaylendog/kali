@@ -5,7 +5,8 @@ use kali_type::Error;
 /// Panics on any parse or type error, so a test cannot pass by accident on a
 /// poisoned `Type::Error`.
 pub fn infer(src: &str) -> String {
-    let (module, errors) = kali_parse::parse_str(src);
+    let (module, errors) =
+        kali_parse::parse_str(src, kali_span::Context { src: kali_span::SourceId(0) });
     assert!(errors.is_empty(), "parse errors: {errors:?}");
     let module = module.unwrap();
     let infer = kali_type::check(&module);
@@ -26,7 +27,7 @@ pub fn infer(src: &str) -> String {
 
 /// Like [`infer`], but expects a failure.
 pub fn fails(src: &str) -> Vec<Error> {
-    let (module, errors) = kali_parse::parse_str(src);
+    let (module, errors) = kali_parse::debug_parse_str(src);
     assert!(errors.is_empty(), "parse errors: {errors:?}");
     let module = module.unwrap();
     let infer = kali_type::check(&module);

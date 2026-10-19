@@ -100,7 +100,6 @@ let sign = x -> if x > 0 {
 } else {
 	0
 }
-let no_else = if ready { go }
 let nested_if = if a {
 	if b {
 		c

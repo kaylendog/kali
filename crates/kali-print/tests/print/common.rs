@@ -6,7 +6,7 @@ pub fn print(src: &str) -> String {
 }
 
 pub fn print_with(src: &str, settings: Settings) -> String {
-    let (module, errors) = kali_parse::parse_str(src);
+    let (module, errors) = kali_parse::debug_parse_str(src);
     assert!(errors.is_empty(), "{src:?} failed to parse: {errors:?}");
     let mut out = Vec::new();
     format_module(&module.unwrap(), src, settings, &mut out).unwrap();

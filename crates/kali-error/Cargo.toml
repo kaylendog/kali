@@ -4,10 +4,12 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+ariadne.workspace = true
 thiserror.workspace = true
 
-ariadne = "0.4"
 pathdiff = "0.2"
 
+kali-ast.path = "../kali-ast"
 kali-parse.path = "../kali-parse"
+kali-span.path = "../kali-span"
 kali-type.path = "../kali-type"

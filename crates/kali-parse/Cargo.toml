@@ -3,15 +3,20 @@ name = "kali-parse"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+default = []
+test = []
+
 [dependencies]
+chumsky.workspace = true
 indexmap.workspace = true
 lasso.workspace = true
 strum.workspace = true
 
-chumsky = { version = "0.12", features = ["pratt"] }
 logos = "0.16.0"
 
 kali-ast.path = "../kali-ast"
+kali-span.path = "../kali-span"
 
 [dev-dependencies]
 pretty_assertions.workspace = true

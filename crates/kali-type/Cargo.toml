@@ -9,8 +9,9 @@ lasso.workspace = true
 strum.workspace = true
 
 kali-ast.path = "../kali-ast"
+kali-span.path = "../kali-span"
 
 [dev-dependencies]
 pretty_assertions.workspace = true
 
-kali-parse.path = "../kali-parse"
+kali-parse = { path = "../kali-parse", features = ["test"] }

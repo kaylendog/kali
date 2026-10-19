@@ -1,8 +1,10 @@
 [workspace]
 resolver = "2"
-members = ["./crates/*"]
+members = ["./crates/*", "crates/kali-main", "crates/kali-span"]
 
 [workspace.dependencies]
+ariadne = "0.4"
+chumsky = { version = "0.12", features = ["pratt"] }
 indexmap = "2.12"
 lasso = "0.7"
 pretty_assertions = "1.4.1"

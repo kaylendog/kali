@@ -1,13 +1,11 @@
 //! The walk over the AST: type expressions, expressions, and later patterns and
 //! items.
 
-use indexmap::IndexMap;
-
 use crate::{
     builtins,
     error::{ErrorKind, Origin},
     infer::Infer,
-    types::{Scheme, Type},
+    types::Type,
 };
 
 impl Infer {
@@ -139,7 +137,8 @@ impl Infer {
                 let value_ty = self.expr(value);
                 let result_ty = self.scope.fresh();
 
-                // For each arm, bind any pattern variables in the current scope.
+                // For each arm, bind any pattern variables in the current
+                // scope.
                 for arm in arms {
                     self.scope.enter();
                     self.pattern(&arm.pattern, &value_ty);

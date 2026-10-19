@@ -3,11 +3,12 @@
 use std::num::ParseIntError;
 
 use logos::Logos;
-use strum::Display;
+use strum::{Display, EnumDiscriminants};
 
 /// An enumeration of possbile tokens that can be lexed from source code.
-#[derive(Debug, Clone, PartialEq, Display, Logos)]
+#[derive(Debug, Clone, PartialEq, Display, Logos, EnumDiscriminants)]
 #[logos(error = LexicalError)]
+#[strum_discriminants(name(TokenKind), derive(Display, Hash))]
 pub enum Token<'src> {
     #[token("if")]
     #[strum(to_string = "if")]

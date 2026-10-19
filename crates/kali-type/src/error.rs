@@ -1,6 +1,7 @@
 //! Type inference errors and their origins.
 
-use kali_ast::{Pattern, Span};
+use kali_ast::Pattern;
+use kali_span::Span;
 
 use crate::types::{Constraint, Type, TypeVar};
 
