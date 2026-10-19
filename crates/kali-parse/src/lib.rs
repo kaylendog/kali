@@ -622,7 +622,8 @@ where
         });
 
     // module ::= item (; item)* ;?
-    item.separated_by(just(Token::SymSemicolon)).allow_trailing().collect::<Vec<_>>()
+    let newline = choice((just(Token::SymSemicolon), just(Token::Eol)));
+    item.separated_by(newline).allow_trailing().collect::<Vec<_>>()
 }
 
 /// Whether a newline after `token` ends the item, like Go's automatic semicolon
@@ -703,7 +704,7 @@ pub fn parse_str<'src>(
         })
         .collect();
 
-    // Split comments out into their own table, and turn line ends into `;`
+    // Split comments out into their own table, and turn line ends into `EOL` tokens
     // where the line ends an item, unless the next significant token closes
     // a bracket. Go does the same.
     let mut comments = BTreeMap::new();
@@ -740,7 +741,7 @@ pub fn parse_str<'src>(
                 )
             });
         if std::mem::take(&mut previous_ends_item) && !next_closes {
-            significant.push((Token::SymSemicolon, *span));
+            significant.push((Token::Eol, *span));
         }
     }
 

@@ -279,6 +279,12 @@ pub enum Token<'src> {
     #[strum_discriminants(strum(to_string = "doc comment"))]
     DocComment(&'src str),
 
+    /// Special token used to indicate the end of a line. This is inserted by
+    /// the lexer to help the parser handle line breaks in a Go-like manner.
+    #[strum(to_string = "end of line")]
+    #[strum_discriminants(strum(to_string = "end of line"))]
+    Eol,
+
     #[strum(to_string = "error")]
     Error(LexicalError),
 }
