@@ -27,7 +27,7 @@ pub fn debug(command: DebugCommand, _opts: &GlobalOpts) {
     let mut context = kali_main::Context::default();
     if let Err(err) = handle(command, &mut context) {
         for e in err {
-            e.into_report().eprint(&mut context);
+            e.into_report().eprint(&mut context).unwrap();
         }
     }
 }

@@ -92,7 +92,8 @@ impl From<&kali_parse::chumsky::error::RichPattern<'_, kali_parse::Token<'_>>> f
             RichPattern::Label(cow) => Expected::Label(cow.clone().into_owned().into_boxed_str()),
             RichPattern::Identifier(val) => Expected::Label(val.clone().into_boxed_str()),
             RichPattern::EndOfInput => Expected::EndOfInput,
-            RichPattern::Any | RichPattern::SomethingElse | _ => unreachable!(),
+            RichPattern::SomethingElse => Expected::Label("something else".into()),
+            RichPattern::Any | _ => unreachable!(),
         }
     }
 }
@@ -162,14 +163,14 @@ impl Error {
         for (i, item) in error.expected.iter().map(ToString::to_string).enumerate() {
             if i > 0 {
                 expected.push_str(", ");
-            }
-            if i == error.expected.len() - 1 && i > 0 {
+            } else if i == error.expected.len() - 1 {
                 expected.push_str(", or ");
             }
             expected.push_str(&item);
         }
 
         Report::build(ariadne::ReportKind::Error, context.src, error.span.start)
+            .with_config(ariadne::Config::default().with_index_type(ariadne::IndexType::Byte))
             .with_message(found)
             .with_label(Label::new(error.span).with_message(expected))
             .finish()
