@@ -9,9 +9,9 @@ use chumsky::{
     prelude::*,
 };
 use kali_ast::{
-    BinaryOp, BinaryOpKind, Comment, CommentKind, Definition, Expr, ExprKind, Ident, ImportTree,
-    ImportTreeKind, Item, ItemKind, LambdaParam, LiteralKind, MatchArm, Module, NodeId, Pattern,
-    PatternKind, PrimitiveTypeKind, Type, TypeAlias, TypeDecl, TypeKind, UnaryOp, UnaryOpKind,
+    BinaryOp, BinaryOpKind, Comment, CommentKind, DataDecl, Definition, Expr, ExprKind, Ident,
+    ImportTree, ImportTreeKind, Item, ItemKind, LambdaParam, LiteralKind, MatchArm, Module, NodeId,
+    Pattern, PatternKind, PrimitiveTypeKind, Type, TypeAlias, TypeKind, UnaryOp, UnaryOpKind,
     Variant, Visibility,
 };
 use logos::Logos;
@@ -130,8 +130,19 @@ where
         .map(TypeKind::Primitive)
         .labelled("primitive type");
 
-        // named ::= ident
-        let named = ident.map(TypeKind::Named).labelled("named type");
+        // named ::= ident (< ty (, ty)* >)?
+        let named = ident
+            .clone()
+            .then(
+                ty.clone()
+                    .separated_by(just(Token::SymComma))
+                    .allow_trailing()
+                    .collect::<Vec<_>>()
+                    .delimited_by(just(Token::OpLessThan), just(Token::OpGreaterThan))
+                    .or_not(),
+            )
+            .map(|(name, params)| TypeKind::Named { name, params: params.unwrap_or_default() })
+            .labelled("named type");
 
         // tuple ::= (ty (, ty)*)
         let tuple = ty
@@ -520,10 +531,9 @@ where
     })
     .labelled("expression");
 
-    // item_type_decl ::= type ident = |? variant (| variant)*
+    // item_data_decl ::= data ident (< ident (, ident)* >)? = |? variant (| variant)*
     // variant ::= constructor [( ty (, ty)* )]
-    // A single payload type is used as is; several become a tuple type.
-    let variant_payload = ty
+    let variant_inner = ty
         .clone()
         .separated_by(just(Token::SymComma))
         .at_least(1)
@@ -538,7 +548,7 @@ where
         })
         .delimited_by(just(Token::SymLParen), just(Token::SymRParen));
     let variant = constructor
-        .then(variant_payload.or_not())
+        .then(variant_inner.or_not())
         .map_with(|(name, payload), e| Variant {
             id: e.state().next_id(),
             name,
@@ -546,21 +556,43 @@ where
             span: e.span(),
         })
         .labelled("variant");
-    let item_type_decl = just(Token::KeywordType)
+    let item_data_decl = just(Token::KeywordData)
         .ignore_then(ident)
+        .then(
+            ident
+                .separated_by(just(Token::SymComma))
+                .at_least(1)
+                .allow_trailing()
+                .collect::<Vec<_>>()
+                .delimited_by(just(Token::OpLessThan), just(Token::OpGreaterThan))
+                .or_not(),
+        )
         .then_ignore(just(Token::OpAssign))
         .then(just(Token::OpBitwiseOr).or_not().ignore_then(
             variant.separated_by(just(Token::OpBitwiseOr)).at_least(1).collect::<Vec<_>>(),
         ))
-        .map(|(name, variants)| ItemKind::TypeDecl(TypeDecl { name, params: Vec::new(), variants }))
-        .labelled("type declaration");
+        .map(|((name, params), variants)| {
+            ItemKind::DataDecl(DataDecl { name, params: params.unwrap_or_default(), variants })
+        })
+        .labelled("data declaration");
 
-    // item_type_alias ::= type ident = ty
+    // item_type_alias := type ident (< ident (, ident)* >)? = ty
     let item_type_alias = just(Token::KeywordType)
         .ignore_then(ident)
+        .then(
+            ident
+                .separated_by(just(Token::SymComma))
+                .at_least(1)
+                .allow_trailing()
+                .collect::<Vec<_>>()
+                .delimited_by(just(Token::OpLessThan), just(Token::OpGreaterThan))
+                .or_not(),
+        )
         .then_ignore(just(Token::OpAssign))
         .then(ty.clone())
-        .map(|(name, ty)| ItemKind::TypeAlias(TypeAlias { name, ty }))
+        .map(|((name, params), ty)| {
+            ItemKind::TypeAlias(TypeAlias { name, params: params.unwrap_or_default(), ty })
+        })
         .labelled("type alias");
 
     // item_import_tree ::= import import_tree
@@ -615,7 +647,7 @@ where
     // item ::= item_type_decl | item_type_alias | item_import_tree |
     // item_definition `item_type_decl` first: `type Foo = Bar` is a
     // one-variant sum type, not an alias.
-    let item = choice((item_type_decl, item_type_alias, item_import_tree, item_definition))
+    let item = choice((item_data_decl, item_type_alias, item_import_tree, item_definition))
         .map_with(|kind, e| {
             let state: &mut SimpleState<State> = e.state();
             Item { id: state.next_id(), visibility: Visibility::Inherited, kind, span: e.span() }
@@ -647,6 +679,8 @@ fn ends_item(token: &Token) -> bool {
             | Token::SymArray
             // `import std :: *` ends in a glob, so `*` at end of line terminates too.
             | Token::OpMultiply
+            // parameterised types end in `>`
+            | Token::OpGreaterThan
     )
 }
 

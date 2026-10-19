@@ -58,6 +58,11 @@ pub enum Token<'src> {
     #[strum(to_string = "as")]
     #[strum_discriminants(strum(to_string = "as"))]
     KeywordAs,
+    #[token("data")]
+    #[strum(to_string = "data")]
+    #[strum_discriminants(strum(to_string = "data"))]
+    KeywordData,
+
     #[token("int")]
     #[strum(to_string = "int")]
     #[strum_discriminants(strum(to_string = "int"))]

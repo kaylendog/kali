@@ -16,17 +16,25 @@ fn definitions() {
 }
 
 #[test]
-fn type_aliases_and_declarations() {
+fn type_aliases() {
     parses("type T = int");
-    parses("type S = Circle(int) | Rectangle(int, int) | Point");
-    parses("type S = | Circle(int) | Point");
-    parses("type S = Foo");
+    let module = parses("type Foo = Bar");
+    assert!(matches!(module.items[0].kind, kali_ast::ItemKind::TypeAlias(_)));
     rejects("type T");
     rejects("type T = ");
-    rejects("type t = Circle(int) |");
-    // Structural unions and intersections are gone.
+    rejects("type S = Circle(int) | Point");
     rejects("type T = int | bool");
-    rejects("type T = { x: int } & { y: int }");
+}
+
+#[test]
+fn data_declarations() {
+    parses("data S = Circle(int) | Rectangle(int, int) | Point");
+    parses("data S = | Circle(int) | Point");
+    let module = parses("data Foo = Bar");
+    assert!(matches!(module.items[0].kind, kali_ast::ItemKind::DataDecl(_)));
+    rejects("data S");
+    rejects("data S = ");
+    rejects("data S = Circle(int) |");
 }
 
 #[test]
@@ -55,7 +63,8 @@ fn line_ends_terminate_items() {
     assert_eq!(item_count("let a = 1; let b = 2;"), 2);
     assert_eq!(item_count("let a = 1 // note\nlet b = 2"), 2);
     assert_eq!(item_count("import std :: *\nlet a = 1"), 2);
-    assert_eq!(item_count("type S = A | B\nlet a = 1"), 2);
+    assert_eq!(item_count("data S = A | B\nlet a = 1"), 2);
+    assert_eq!(item_count("type X = Result<(), Error>\nlet a = 1"), 2);
     rejects("let a = 1 let b = 2");
 }
 
@@ -68,7 +77,7 @@ fn line_ends_continue_open_constructs() {
     assert_eq!(item_count("let x = f (\n\ta)"), 1);
     assert_eq!(item_count("let x = match a {\n\t| 0 -> 1\n\t| _ -> 2\n}"), 1);
     assert_eq!(item_count("let x = if a {\n\tb\n} else {\n\tc\n}"), 1);
-    assert_eq!(item_count("type S =\n\t| A\n\t| B"), 1);
+    assert_eq!(item_count("data S =\n\t| A\n\t| B"), 1);
     assert_eq!(item_count("let f = a ->\n\ta + 1"), 1);
     assert_eq!(item_count("let x = a &&\n\tb"), 1);
 }

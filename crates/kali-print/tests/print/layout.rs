@@ -41,8 +41,8 @@ fn line_before_closing_bracket_continues() {
 
 #[test]
 fn variants_may_span_lines() {
-    assert_round_trip("type S =\n\t| A\n\t| B", "type S = A | B\n");
-    assert_round_trip("type S = A\n\t| B", "type S = A | B\n");
+    assert_round_trip("data S =\n\t| A\n\t| B", "data S = A | B\n");
+    assert_round_trip("data S = A\n\t| B", "data S = A | B\n");
 }
 
 #[test]

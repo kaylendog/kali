@@ -23,3 +23,10 @@ fn composites() {
 fn annotations_in_lambda_params() {
     assert_fixed("let f = (a: [int]) (b: { x: int }) (c: (int, bool)) -> a\n");
 }
+
+#[test]
+fn data() {
+    assert_fixed(
+        "data Shape = Circle(int) | Rectangle(int, int) | Point\nlet circle = Circle 3\nlet rect = Rectangle (2, 4)\n",
+    );
+}

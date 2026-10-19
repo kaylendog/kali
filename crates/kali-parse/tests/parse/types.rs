@@ -58,3 +58,12 @@ fn annotations_in_lambda_params() {
     parses("let f = (a: [int]) (b: { x: int }) (c: (int, bool)) -> a");
     rejects("let f = (a: int -> int) -> a");
 }
+
+#[test]
+fn type_parameters() {
+    parses("data Result<T, E> = Ok(T) | Err(E)");
+    parses("type Pair<T> = (T, T)");
+    parses("type ProcessResult = Result<(), Error>");
+    rejects("type Pair<> = int");
+    rejects("data D<T = Ok(T)");
+}

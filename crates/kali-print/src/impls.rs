@@ -8,9 +8,9 @@
 use std::{borrow::Cow, collections::BTreeMap, io};
 
 use kali_ast::{
-    BinaryOpKind, Comment, CommentKind, Definition, Expr, ExprKind, Ident, ImportTree,
+    BinaryOpKind, Comment, CommentKind, DataDecl, Definition, Expr, ExprKind, Ident, ImportTree,
     ImportTreeKind, Item, ItemKind, LambdaParam, LiteralKind, MatchArm, Module, NodeId, Pattern,
-    PatternKind, PrimitiveTypeKind, Type, TypeAlias, TypeDecl, TypeKind, Variant, Visibility,
+    PatternKind, PrimitiveTypeKind, Type, TypeAlias, TypeKind, Variant, Visibility,
 };
 use pretty::{RcDoc, Render, RenderAnnotated};
 
@@ -235,7 +235,7 @@ impl PrettyPrint for Item {
         let doc = match &self.kind {
             ItemKind::Definition(definition) => definition.pretty_print(ctx),
             ItemKind::TypeAlias(alias) => alias.pretty_print(ctx),
-            ItemKind::TypeDecl(decl) => decl.pretty_print(ctx),
+            ItemKind::DataDecl(decl) => decl.pretty_print(ctx),
             ItemKind::Import(import) => ctx.text("import ").append(import.pretty_print(ctx)),
         };
         if self.visibility == Visibility::Exported { ctx.text("export ").append(doc) } else { doc }
@@ -261,7 +261,7 @@ impl PrettyPrint for TypeAlias {
     }
 }
 
-impl PrettyPrint for TypeDecl {
+impl PrettyPrint for DataDecl {
     fn pretty_print(&self, ctx: &mut Context) -> Doc {
         // `type S = A | B` when it fits, else one variant per line, each after
         // a leading `|`.
@@ -275,7 +275,7 @@ impl PrettyPrint for TypeDecl {
                 RcDoc::line().append(pipe).append(variant.pretty_print(ctx))
             })
             .collect::<Vec<_>>();
-        ctx.text("type ")
+        ctx.text("data ")
             .append(self.name.pretty_print(ctx))
             .append(ctx.text(" ="))
             .append(RcDoc::concat(variants).nest(ctx.indent()).group())
@@ -336,7 +336,14 @@ impl PrettyPrint for Type {
                 PrimitiveTypeKind::String => "string",
                 PrimitiveTypeKind::Unit => "()",
             }),
-            TypeKind::Named(name) => name.pretty_print(ctx),
+            TypeKind::Named { name, params } => {
+                if params.is_empty() {
+                    name.pretty_print(ctx)
+                } else {
+                    let params = params.iter().map(|ty| ty.pretty_print(ctx)).collect();
+                    name.pretty_print(ctx).append(ctx.delimited("<", ">", false, params))
+                }
+            }
             TypeKind::Tuple(types) => {
                 let types = types.iter().map(|ty| ty.pretty_print(ctx)).collect();
                 ctx.delimited("(", ")", false, types)

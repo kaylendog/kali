@@ -234,7 +234,7 @@ impl Walker {
         match &item.kind {
             ItemKind::Import(import_tree) => self.walk_import_tree(visitor, import_tree)?,
             ItemKind::TypeAlias(type_alias) => self.walk_type_alias(visitor, type_alias)?,
-            ItemKind::TypeDecl(type_decl) => {
+            ItemKind::DataDecl(type_decl) => {
                 self.walk_ident(visitor, &type_decl.name)?;
                 for variant in &type_decl.variants {
                     self.walk_ident(visitor, &variant.name)?;
@@ -339,8 +339,11 @@ impl Walker {
 
         match &ty.kind {
             TypeKind::Primitive(_) => {}
-            TypeKind::Named(ident) => {
-                self.walk_ident(visitor, ident)?;
+            TypeKind::Named { name, params } => {
+                self.walk_ident(visitor, name)?;
+                for param in params {
+                    self.walk_type(visitor, param)?;
+                }
             }
             TypeKind::Tuple(items) => {
                 for item in items {

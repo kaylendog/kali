@@ -188,7 +188,6 @@ Users can compose their own data types using these composite data types, and use
 ```kali
 type Person = (string, int, bool)
 type Point = { x: int, y: int }
-type Shape = Circle(int) | Rectangle(int, int)
 type List = [int]
 ```
 
@@ -217,7 +216,7 @@ let unit = ()
 Sum types are a composite data type that can hold one of several different values. They are defined using the `|` syntax, with each value separated by a pipe.
 
 ```kali
-type Shape = Circle(int) | Rectangle(int, int)
+data Shape = Circle(int) | Rectangle(int, int)
 ```
 
 Sum types support three types of variant: simple, tuple, and record.
@@ -232,7 +231,7 @@ sum_type_variant = type ("(" type ("," type)* ")")
 Each variant is a constructor taking one payload: `Circle` is a function from `int` to `Shape`, `Rectangle` takes the tuple `(int, int)`, and a variant with no payload is a value of the type. Constructors are applied like any function. A declaration may span lines, with each variant on its own line after a `|`, and a declaration whose only variant is a bare constructor, such as `type Foo = Bar`, is a one-variant sum type rather than an alias.
 
 ```kali
-type Shape =
+data Shape =
   | Circle(int)
   | Rectangle(int, int)
   | Point
@@ -305,6 +304,27 @@ let unit = ()
 The `Never` type is a special data type that has no values. It is used to represent a computation that never completes, or a value that can never be produced. It is often used to represent type errors, or to signal that type checking has failed.
 
 > *Note:* The `Never` type is a theoretical type used internally by the compiler and type checker. It cannot be written or referenced directly in Kali source code. Programmers will never need to annotate a variable or function as `Never`, nor can a value of type `Never` be constructed or matched in user code.
+
+=== Parameterised Types
+
+Both type aliases and data type declarations can be parameterised over an arbitrary number of types.
+
+```kali
+data Result<T, E> =
+  | Ok(T)
+  | Err(E)
+
+type ProcessResult = Result<(), Error>
+```
+
+=== Let-polymorphism
+
+Kali implements a form of polymorphism known as "let-polymorphism", as found in other functional programming languages, such as OCaml and Haskell.
+
+```kali
+let first = (a, _) -> a // has type (a', 'b) -> 'a
+let second = (_, a) -> b // has type (a', 'b) -> 'b
+```
 
 == Control Flow
 
@@ -395,7 +415,7 @@ The available patterns are:
 Matching on a sum type:
 
 ```kali
-type Shape = Circle(int) | Rectangle(int, int)
+data Shape = Circle(int) | Rectangle(int, int)
 
 let area = shape -> match shape {
   | Circle(r) -> 3 * r * r

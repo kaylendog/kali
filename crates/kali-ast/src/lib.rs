@@ -100,7 +100,7 @@ pub enum ItemKind {
     /// Represents a type alias.
     TypeAlias(TypeAlias),
     /// Represents a sum type declaration.
-    TypeDecl(TypeDecl),
+    DataDecl(DataDecl),
     /// Represents a definition in the source code.
     Definition(Definition),
 }
@@ -118,10 +118,10 @@ impl ItemKind {
         if let ItemKind::TypeAlias(alias) = self { Some(alias) } else { None }
     }
 
-    /// Return the [`TypeDecl`] if this item is a type declaration, otherwise
+    /// Return the [`DataDecl`] if this item is a data declaration, otherwise
     /// return `None`.
-    pub fn as_type_decl(&self) -> Option<&TypeDecl> {
-        if let ItemKind::TypeDecl(decl) = self { Some(decl) } else { None }
+    pub fn as_data_decl(&self) -> Option<&DataDecl> {
+        if let ItemKind::DataDecl(decl) = self { Some(decl) } else { None }
     }
 
     /// Return the [`Definition`] if this item is a definition, otherwise return
@@ -186,13 +186,15 @@ pub enum ImportTreeKind {
 pub struct TypeAlias {
     /// The name of the type alias.
     pub name: Ident,
+    /// Parameters for the type alias, if any.
+    pub params: Vec<Ident>,
     /// The aliased type.
     pub ty: Type,
 }
 
 /// A sum type declaration, e.g. `type Shape = Circle(int) | Point`.
 #[derive(Debug, Clone)]
-pub struct TypeDecl {
+pub struct DataDecl {
     /// The name of the type.
     pub name: Ident,
     /// Generic parameters. Always empty until generics are parsed.
@@ -236,8 +238,13 @@ pub struct Type {
 pub enum TypeKind {
     /// A primitive type (e.g., int, float, bool, string, unit).
     Primitive(PrimitiveTypeKind),
-    /// A named type, which refers to a type with a specific identifier.
-    Named(Ident),
+    /// A named type with generic parameters, e.g., `Option<T>`.
+    Named {
+        /// The name of the type.
+        name: Ident,
+        /// The generic parameters of the type, if any.
+        params: Vec<Type>,
+    },
     /// A tuple type containing multiple types.
     Tuple(Vec<Type>),
     /// A list type containing elements of a single type.

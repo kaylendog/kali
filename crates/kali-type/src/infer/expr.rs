@@ -20,9 +20,9 @@ impl Infer {
                 PrimitiveTypeKind::String => Type::String,
                 PrimitiveTypeKind::Unit => Type::Unit,
             },
-            TypeKind::Named(ident) => match self.scope.lookup_type(ident.key).cloned() {
+            TypeKind::Named { name, params } => match self.scope.lookup_type(name.key).cloned() {
                 Some(ty) => ty,
-                None => self.error(ErrorKind::UnknownName(ident.key), Origin::Name(ident.span)),
+                None => self.error(ErrorKind::UnknownName(name.key), Origin::Name(name.span)),
             },
             TypeKind::Tuple(items) => {
                 Type::Tuple(items.iter().map(|item| self.type_expr(item)).collect())

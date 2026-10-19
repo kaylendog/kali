@@ -56,10 +56,10 @@ fn calls_never_break() {
 
 #[test]
 fn sum_types_break_one_variant_per_line() {
-    assert_wraps("type Unit = Only\n", "type Unit = Only\n");
+    assert_wraps("data Unit = Only\n", "data Unit = Only\n");
     assert_wraps(
-        "type Shape = Circle(float) | Rectangle(float, float) | Dot\n",
-        "type Shape =\n\t| Circle(float)\n\t| Rectangle(float, float)\n\t| Dot\n",
+        "data Shape = Circle(float) | Rectangle(float, float) | Dot\n",
+        "data Shape =\n\t| Circle(float)\n\t| Rectangle(float, float)\n\t| Dot\n",
     );
 }
 
