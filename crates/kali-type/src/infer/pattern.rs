@@ -52,7 +52,7 @@ impl Infer {
                 self.unify(&pat_lhs_ty, &pat_rhs_ty, Origin::Pattern(pat.span));
                 pat_lhs_ty
             }
-            PatternKind::Constructor { name: _, payload } => {
+            PatternKind::Constructor { name: _, payload: _ } => {
                 todo!()
             }
             PatternKind::Rest => {
@@ -63,6 +63,6 @@ impl Infer {
             }
         };
 
-        self.unify(&pat_ty, &input_ty, Origin::Pattern(pat.span))
+        self.unify(&pat_ty, input_ty, Origin::Pattern(pat.span))
     }
 }

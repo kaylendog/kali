@@ -40,9 +40,7 @@ fn handle(
         DebugCommand::Parse { file } => {
             let id = context.load(&file)?;
             context.parse(id)?;
-            context.get_module(id).map(|module| {
-                println!("{:#?}", module);
-            });
+            if let Some(module) = context.get_module(id) { println!("{:#?}", module) }
             Ok(())
         }
         DebugCommand::Format { file } => {

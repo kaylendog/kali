@@ -78,7 +78,7 @@ impl<'src> From<kali_parse::Error<'src>> for ParseError {
                     span: *span,
                 })
                 .collect::<Vec<_>>(),
-            span: error.span().clone(),
+            span: *error.span(),
         }
     }
 }
@@ -178,8 +178,8 @@ impl Error {
 
     /// Convert a list of type errors into an `ariadne::Report`.
     fn into_type_report(
-        context: kali_span::Context,
-        error: kali_type::Error,
+        _context: kali_span::Context,
+        _error: kali_type::Error,
     ) -> Report<'static, kali_span::Span> {
         todo!()
     }

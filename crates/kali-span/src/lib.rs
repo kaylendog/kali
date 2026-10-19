@@ -3,7 +3,7 @@
 
 use std::{
     fmt,
-    ops::{self, Deref, Range},
+    ops::{self, Range},
 };
 
 /// A simple span representing a range in the source code, with a start and end
@@ -95,13 +95,13 @@ impl chumsky::span::Span for Span {
         Self { start: range.start, end: range.end, context }
     }
     fn context(&self) -> Self::Context {
-        self.context.clone()
+        self.context
     }
     fn start(&self) -> Self::Offset {
-        self.start.clone()
+        self.start
     }
     fn end(&self) -> Self::Offset {
-        self.end.clone()
+        self.end
     }
 }
 
